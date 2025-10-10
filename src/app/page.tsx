@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { ApplicationContext, PagesContext } from "@sitecore-marketplace-sdk/client";
 import { useMarketplaceClient } from "@/src/utils/hooks/useMarketplaceClient";
 import GraphQLQuery from "../components/GetPageTemplates";
+import DocumentImporter from "../components/DocumentImporter";
 
 function App() {
   const { client, error, isInitialized } = useMarketplaceClient();
@@ -47,6 +48,8 @@ function App() {
             </ul>
 
             <GraphQLQuery appContext={appContext} client={client} />
+
+            <DocumentImporter />
           </div>
         </>
       )}
