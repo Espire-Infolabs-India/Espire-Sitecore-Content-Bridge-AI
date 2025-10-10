@@ -1,7 +1,35 @@
+"use client";
+import { useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import { getPageTemplates } from "../utils/gqlQueries/getPageTemplates";
 
-// GraphQL query to retrieve item details:
+// Types
+interface Field {
+  name?: string;
+  value?: string;
+}
+
+interface StandardValuesItem {
+  field?: Field;
+}
+
+interface Template {
+  standardValuesItem?: StandardValuesItem;
+}
+
+interface Child {
+  name?: string;
+  children?: {
+    nodes?: {
+      template?: Template;
+    }[];
+  };
+}
+
+interface ExtractedItem {
+  name: string;
+  finalRenderings: string;
+}
 
 export default function GraphQLQuery({
   appContext,
@@ -10,20 +38,19 @@ export default function GraphQLQuery({
   appContext: any;
   client: ClientSDK | null;
 }) {
+  const [extractedData, setExtractedData] = useState<ExtractedItem[]>([]);
+
   const makeGraphQLQuery = async () => {
-    // Get the Sitecore Context ID from the application context:
     const sitecoreContextId = appContext.resourceAccess?.[0]?.context.preview;
 
-    // Check if the Sitecore Context ID is available:
     if (!sitecoreContextId) {
       console.error(
-        "Sitecore Context ID not found in application context. Make sure your app is configured to use XM Cloud APIs."
+        "❌ Sitecore Context ID not found. Make sure your app is configured to use XM Cloud APIs."
       );
       return;
     }
 
-    // Make the GraphQL query:
-    const response = await client?.mutate("xmc.authoring.graphql", {
+    await client?.mutate("xmc.authoring.graphql", {
       params: {
         query: {
           sitecoreContextId,
@@ -31,13 +58,43 @@ export default function GraphQLQuery({
         body: getPageTemplates,
       },
       onSuccess: (data) => {
-        console.log("GraphQL query successful:", data);
+        console.log("✅ GraphQL query successful:", data);
+
+        const nodes: Child[] = data?.data?.data?.item?.children?.nodes ?? [];
+
+        const extracted = nodes.map((child) => {
+          const name = child?.name ?? "";
+          const finalRenderings =
+            child?.children?.nodes?.[0]?.template?.standardValuesItem?.field?.value ?? "";
+          return { name, finalRenderings };
+        });
+
+        console.log("✅ Extracted Data:", extracted);
+
+        setExtractedData(extracted); // ✅ Store in state
       },
       onError: (error) => {
-        console.error("GraphQL query failed:", error);
+        console.error("❌ GraphQL query failed:", error);
       },
     });
   };
 
-  return <button onClick={makeGraphQLQuery}>Make GraphQL query</button>;
+  return (
+    <div>
+      <button onClick={makeGraphQLQuery}>Make GraphQL Query</button>
+
+      {extractedData.length > 0 && (
+        <div className="mt-4">
+          <h3>Extracted Data:</h3>
+          <ul>
+            {extractedData.map((item, index) => (
+              <li key={index}>
+                <strong>{item.name}</strong>: {item.finalRenderings}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }

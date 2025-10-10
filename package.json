@@ -10,12 +10,12 @@
     "@sitecore-marketplace-sdk/client": "^0.2.0",
     "@sitecore-marketplace-sdk/xmc": "^0.2.0",
     "@tailwindcss/postcss": "^4.1.14",
-    "autoprefixer": "^10.4.21",
+    "autoprefixer": "^9.8.8",
     "next": "^15.4.6",
-    "postcss": "^8.5.6",
+    "postcss": "^7.0.39",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "tailwindcss": "^4.1.14"
+    "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.2.17"
   },
   "devDependencies": {
     "@types/node": "^24.2.0",
