@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import { getPageTemplates } from "../utils/gqlQueries/getPageTemplates";
 import { parseRenderingsFromXml } from "../utils/lib/parseRenderingsFromXml";
-import GenerateContent from "./GenerateContent";
 
 // Types
 interface Field {
@@ -35,17 +34,17 @@ interface ExtractedItem {
   finalRenderings: string;
 }
 
-export default function GetPageTemplates({
+export default function GenerateContent({
   appContext,
   client,
+  selectedTemplateData,
 }: {
   appContext: any;
   client: ClientSDK | null;
+  selectedTemplateData: ExtractedItem | null;
 }) {
   const [extractedData, setExtractedData] = useState<ExtractedItem[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
-  const [selectedTemplateData, setSelectedTemplateData] = useState<ExtractedItem | null>(null);
-  const [generateContent, setGenerateContent] = useState<boolean | null>(false);
 
   const makeGraphQLQuery = async () => {
     const sitecoreContextId = appContext?.resourceAccess?.[0]?.context?.preview;
@@ -78,57 +77,50 @@ export default function GetPageTemplates({
       },
     });
   };
-  const handleRadioChange = (item: ExtractedItem) => {
 
-    console.log("Item Dataa :::::;" , item)
-    setSelectedTemplateData(item)
-    setSelectedName(item.name);
-    // if (item.finalRenderings) {
-    //   const renderings = parseRenderingsFromXml(item.finalRenderings);
-    //   console.log("🧩 Parsed Renderings for:", item.name, renderings);
-    // } else {
-    //   console.warn(`⚠️ No finalRenderings found for ${item.name}`);
-    // }
-    setGenerateContent(true);
-  };
   useEffect(() => {
     makeGraphQLQuery();
   }, []);
 
-  if (generateContent) {
-    return <GenerateContent appContext={appContext} client={client} selectedTemplateData={selectedTemplateData} />;
-  }
-
   return (
     <div className="p-4">
-
-      <h1> Screen 2</h1>
-      {extractedData.length > 0 ? (
+     <h1> Screen 3</h1>
         <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-2">Landing Pages ::</h3>
+          <h3 className="text-lg font-semibold mb-2">Generate Content ::</h3>
           <div className="space-y-3">
-            {extractedData.map((item) => (
-              <div
-                key={item.itemID}
-                className="flex items-center space-x-3 p-2 border rounded cursor-pointer hover:bg-gray-50"
-                onClick={() => handleRadioChange(item)}
-              >
-                <input
-                  type="radio"
-                  name="templateRadio"
-                  value={item.name}
-                  checked={selectedName === item.name}
-                  onChange={() => handleRadioChange(item)}
-                  className="cursor-pointer"
-                />
-                <span>{item.name}</span>
+            {selectedTemplateData ? (
+              <div className="p-4 border rounded bg-gray-50">
+                <h4 className="text-md font-medium mb-2">
+                  Selected Template: {selectedTemplateData.name}
+                </h4>
+                <h4>
+                  Page Item ID: {selectedTemplateData.itemID}
+                </h4>
+                {selectedTemplateData.finalRenderings ? (
+                  <div>
+                    <h5 className="font-semibold mb-1">Parsed Renderings:</h5>
+                    <pre className="bg-white p-2 border rounded overflow-x-auto">
+                      {JSON.stringify(
+                        parseRenderingsFromXml(
+                          selectedTemplateData.finalRenderings
+                        ),
+                        null,
+                        2
+                      )}
+                    </pre>
+                  </div>
+                ) : (
+                  <p className="text-yellow-600">
+                    ⚠️ No finalRenderings found for {selectedTemplateData.name}
+                  </p>
+                )}
               </div>
-            ))}
+            ) : (
+              <p>Please select a template to see details.</p>
+            )}
           </div>
         </div>
-      ) : (
-        <p>Loading templates...</p>
-      )}
+    
     </div>
   );
 }

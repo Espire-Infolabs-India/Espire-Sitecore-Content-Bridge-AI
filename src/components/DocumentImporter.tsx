@@ -1,6 +1,8 @@
 "use client";
 import React, { useRef, useState } from "react";
 import styles from "./DocumentImporter.module.css";
+import GetPageTemplates from "./GetPageTemplates";
+import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 
 type UploadedFile = {
   name: string;
@@ -8,14 +10,21 @@ type UploadedFile = {
   type: string;
   base64: string;
   original?: File | null;
-  content?: string; // extracted text
+  content?: string;
 };
 
-export default function DocumentImporter() {
+export default function DocumentImporter({
+  appContext,
+  client,
+}: {
+  appContext: any;
+  client: ClientSDK | null;
+}) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<UploadedFile | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [importing, setImporting] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [showPageTemplates, setShowPageTemplates] = useState(false); 
 
   const readFileAsBase64 = (file: File): Promise<string | ArrayBuffer | null> =>
     new Promise((resolve, reject) => {
@@ -47,31 +56,38 @@ export default function DocumentImporter() {
   };
 
   const onChooseClick = () => inputRef.current?.click();
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("Event ::", e.target);
-    handleFileObject(e.target.files?.[0] ?? null);
-  }
 
+  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    handleFileObject(e.target.files?.[0] ?? null);
 
   const handleImport = async () => {
+    // setImporting(true);
+    // setTimeout(() => {
+      setShowPageTemplates(true); 
+      // setImporting(false);
 
-    console.log('Importing file:', file);
-
+    // }, 800);
   };
 
   const reset = () => {
     setFile(null);
     setLoading(false);
     setImporting(false);
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
+    inputRef.current && (inputRef.current.value = "");
   };
 
+  // 👇 conditionally render GetPageTemplates
+  if (showPageTemplates) {
+    return <GetPageTemplates appContext={appContext} client={client} />;
+  }
 
   return (
     <div className={`${styles.container} max-w-5xl mx-auto p-6`}>
-      <h3 className={`${styles.title} text-2xl font-semibold mb-4`}>Content Bridge AI</h3>
+
+      <h1>Screen 1</h1>
+      <h3 className={`${styles.title} text-2xl font-semibold mb-4`}>
+        Content Bridge AI
+      </h3>
       <div className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden`}>
         <div className={`${styles.cardInner} md:flex md:items-start md:gap-6 p-6`}>
           {/* Drag & Drop Area */}
@@ -108,7 +124,6 @@ export default function DocumentImporter() {
             </div>
 
             {/* Selected File details */}
-
             <div className="mt-4 px-2">
               {file ? (
                 <div className={styles.fileBox}>

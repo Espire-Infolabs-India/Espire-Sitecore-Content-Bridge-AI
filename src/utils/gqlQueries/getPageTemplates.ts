@@ -4,6 +4,7 @@ export const getPageTemplates = {
     children {
       nodes {
         name
+        itemId
         children {
           nodes {
             template {
