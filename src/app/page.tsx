@@ -1,9 +1,10 @@
 "use client";
-
 import { useState, useEffect } from "react";
-import type { ApplicationContext, PagesContext } from "@sitecore-marketplace-sdk/client";
+import type {
+  ApplicationContext,
+  PagesContext,
+} from "@sitecore-marketplace-sdk/client";
 import { useMarketplaceClient } from "@/src/utils/hooks/useMarketplaceClient";
-import GetPageTemplates from "../components/GetPageTemplates";
 import DocumentImporter from "../components/DocumentImporter";
 
 function App() {
@@ -15,7 +16,8 @@ function App() {
       console.log("Marketplace client initialized successfully.", client);
 
       // Always query the application context
-      client.query("application.context")
+      client
+        .query("application.context")
         .then((res) => {
           console.log("Success retrieving application.context:", res.data);
           setAppContext(res.data);
@@ -23,7 +25,6 @@ function App() {
         .catch((error) => {
           console.error("Error retrieving application.context:", error);
         });
-
     } else if (error) {
       console.error("Error initializing Marketplace client:", error);
     }
@@ -33,12 +34,8 @@ function App() {
     <>
       {isInitialized && (
         <>
-
           <div className="application-context">
-
-
             <DocumentImporter appContext={appContext} client={client} />
-
           </div>
         </>
       )}

@@ -24,7 +24,7 @@ export default function DocumentImporter({
   const [file, setFile] = useState<UploadedFile | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [showPageTemplates, setShowPageTemplates] = useState(false); 
+  const [showPageTemplates, setShowPageTemplates] = useState(false);
 
   const readFileAsBase64 = (file: File): Promise<string | ArrayBuffer | null> =>
     new Promise((resolve, reject) => {
@@ -40,7 +40,13 @@ export default function DocumentImporter({
     try {
       const dataUrl = await readFileAsBase64(f);
       const base64 = String(dataUrl).split(",")[1] || "";
-      setFile({ name: f.name, size: f.size, type: f.type, base64, original: f });
+      setFile({
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        base64,
+        original: f,
+      });
     } catch (err) {
       console.error(err);
       alert("Failed to read file");
@@ -61,12 +67,7 @@ export default function DocumentImporter({
     handleFileObject(e.target.files?.[0] ?? null);
 
   const handleImport = async () => {
-    // setImporting(true);
-    // setTimeout(() => {
-      setShowPageTemplates(true); 
-      // setImporting(false);
-
-    // }, 800);
+    setShowPageTemplates(true);
   };
 
   const reset = () => {
@@ -76,34 +77,47 @@ export default function DocumentImporter({
     inputRef.current && (inputRef.current.value = "");
   };
 
-  // 👇 conditionally render GetPageTemplates
   if (showPageTemplates) {
     return <GetPageTemplates appContext={appContext} client={client} />;
   }
 
   return (
     <div className={`${styles.container} max-w-5xl mx-auto p-6`}>
-
       <h1>Screen 1</h1>
       <h3 className={`${styles.title} text-2xl font-semibold mb-4`}>
         Content Bridge AI
       </h3>
-      <div className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden`}>
-        <div className={`${styles.cardInner} md:flex md:items-start md:gap-6 p-6`}>
+      <div
+        className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden`}
+      >
+        <div
+          className={`${styles.cardInner} md:flex md:items-start md:gap-6 p-6`}
+        >
           {/* Drag & Drop Area */}
-          <div className={styles.left} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+          <div
+            className={styles.left}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+          >
             <div
               role="button"
               tabIndex={0}
               onClick={onChooseClick}
-              className={`${styles.dropArea} relative border rounded-md h-48 flex flex-col items-center justify-center p-6 cursor-pointer transition-colors 
+              className={`${
+                styles.dropArea
+              } relative border rounded-md h-48 flex flex-col items-center justify-center p-6 cursor-pointer transition-colors 
                 ${loading ? "opacity-70" : "hover:bg-gray-50"}`}
             >
               <div className={styles.dropNote}>Drag & drop or</div>
-              <div className={`${styles.previewText} mt-2 text-sm text-gray-700`}>
-                <strong className="text-indigo-600">Choose File</strong> to upload
+              <div
+                className={`${styles.previewText} mt-2 text-sm text-gray-700`}
+              >
+                <strong className="text-indigo-600">Choose File</strong> to
+                upload
               </div>
-              <div className={`${styles.supportText} mt-1 text-xs text-gray-400`}>
+              <div
+                className={`${styles.supportText} mt-1 text-xs text-gray-400`}
+              >
                 Supported formats: PDF, DOCX, DOC, TXT
               </div>
               <input
@@ -129,10 +143,15 @@ export default function DocumentImporter({
                 <div className={styles.fileBox}>
                   <div>
                     <div className={styles.fileName}>{file.name}</div>
-                    <div className={styles.fileSize}>{Math.round(file.size / 1024)} KB</div>
+                    <div className={styles.fileSize}>
+                      {Math.round(file.size / 1024)} KB
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={reset} className={`${styles.btn} ${styles.cancelBtn}`}>
+                    <button
+                      onClick={reset}
+                      className={`${styles.btn} ${styles.cancelBtn}`}
+                    >
                       Remove
                     </button>
                   </div>
@@ -146,13 +165,18 @@ export default function DocumentImporter({
 
         {/* Footer Buttons */}
         <div className={styles.footer}>
-          <button onClick={reset} className={`${styles.btn} ${styles.cancelBtn}`}>
+          <button
+            onClick={reset}
+            className={`${styles.btn} ${styles.cancelBtn}`}
+          >
             Cancel
           </button>
           <button
             onClick={handleImport}
             disabled={!file || loading || importing}
-            className={`${styles.importBtn} ${(!file || loading || importing) ? styles.disabled : ""}`}
+            className={`${styles.importBtn} ${
+              !file || loading || importing ? styles.disabled : ""
+            }`}
           >
             {importing ? (
               <>

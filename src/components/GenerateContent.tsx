@@ -84,43 +84,40 @@ export default function GenerateContent({
 
   return (
     <div className="p-4">
-     <h1> Screen 3</h1>
-        <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-2">Generate Content ::</h3>
-          <div className="space-y-3">
-            {selectedTemplateData ? (
-              <div className="p-4 border rounded bg-gray-50">
-                <h4 className="text-md font-medium mb-2">
-                  Selected Template: {selectedTemplateData.name}
-                </h4>
-                <h4>
-                  Page Item ID: {selectedTemplateData.itemID}
-                </h4>
-                {selectedTemplateData.finalRenderings ? (
-                  <div>
-                    <h5 className="font-semibold mb-1">Parsed Renderings:</h5>
-                    <pre className="bg-white p-2 border rounded overflow-x-auto">
-                      {JSON.stringify(
-                        parseRenderingsFromXml(
-                          selectedTemplateData.finalRenderings
-                        ),
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </div>
-                ) : (
-                  <p className="text-yellow-600">
-                    ⚠️ No finalRenderings found for {selectedTemplateData.name}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p>Please select a template to see details.</p>
-            )}
-          </div>
+      <h1> Screen 3</h1>
+      <div className="mt-4">
+        <h3 className="text-lg font-semibold mb-2">Generate Content ::</h3>
+        <div className="space-y-3">
+          {selectedTemplateData ? (
+            <div className="p-4 border rounded bg-gray-50">
+              <h4 className="text-md font-medium mb-2">
+                Selected Template: {selectedTemplateData.name}
+              </h4>
+              <h4>Page Item ID: {selectedTemplateData.itemID}</h4>
+              {selectedTemplateData.finalRenderings ? (
+                <div>
+                  <h5 className="font-semibold mb-1">Parsed Renderings:</h5>
+                  <pre className="bg-white p-2 border rounded overflow-x-auto">
+                    {JSON.stringify(
+                      parseRenderingsFromXml(
+                        selectedTemplateData.finalRenderings
+                      ),
+                      null,
+                      2
+                    )}
+                  </pre>
+                </div>
+              ) : (
+                <p className="text-yellow-600">
+                  ⚠️ No finalRenderings found for {selectedTemplateData.name}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p>Please select a template to see details.</p>
+          )}
         </div>
-    
+      </div>
     </div>
   );
 }

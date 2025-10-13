@@ -5,7 +5,6 @@ import { getPageTemplates } from "../utils/gqlQueries/getPageTemplates";
 import { parseRenderingsFromXml } from "../utils/lib/parseRenderingsFromXml";
 import GenerateContent from "./GenerateContent";
 
-// Types
 interface Field {
   name?: string;
   value?: string;
@@ -44,7 +43,8 @@ export default function GetPageTemplates({
 }) {
   const [extractedData, setExtractedData] = useState<ExtractedItem[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
-  const [selectedTemplateData, setSelectedTemplateData] = useState<ExtractedItem | null>(null);
+  const [selectedTemplateData, setSelectedTemplateData] =
+    useState<ExtractedItem | null>(null);
   const [generateContent, setGenerateContent] = useState<boolean | null>(false);
 
   const makeGraphQLQuery = async () => {
@@ -79,16 +79,9 @@ export default function GetPageTemplates({
     });
   };
   const handleRadioChange = (item: ExtractedItem) => {
-
-    console.log("Item Dataa :::::;" , item)
-    setSelectedTemplateData(item)
+    console.log("Item Dataa :::::;", item);
+    setSelectedTemplateData(item);
     setSelectedName(item.name);
-    // if (item.finalRenderings) {
-    //   const renderings = parseRenderingsFromXml(item.finalRenderings);
-    //   console.log("🧩 Parsed Renderings for:", item.name, renderings);
-    // } else {
-    //   console.warn(`⚠️ No finalRenderings found for ${item.name}`);
-    // }
     setGenerateContent(true);
   };
   useEffect(() => {
@@ -96,12 +89,17 @@ export default function GetPageTemplates({
   }, []);
 
   if (generateContent) {
-    return <GenerateContent appContext={appContext} client={client} selectedTemplateData={selectedTemplateData} />;
+    return (
+      <GenerateContent
+        appContext={appContext}
+        client={client}
+        selectedTemplateData={selectedTemplateData}
+      />
+    );
   }
 
   return (
     <div className="p-4">
-
       <h1> Screen 2</h1>
       {extractedData.length > 0 ? (
         <div className="mt-4">
