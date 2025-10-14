@@ -101,6 +101,7 @@ export default function GetPageTemplates({
   return (
     <div className="p-4">
       <h1> Screen 2</h1>
+      <button onClick={makeGraphQLQuery}> Make query </button>
       {extractedData.length > 0 ? (
         <div className="mt-4">
           <h3 className="text-lg font-semibold mb-2">Landing Pages ::</h3>
