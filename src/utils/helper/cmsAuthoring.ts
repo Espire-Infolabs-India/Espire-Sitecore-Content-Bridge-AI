@@ -25,6 +25,8 @@ export interface TemplateFieldMeta {
   source?: string;
   shared?: boolean;
   unversioned?: boolean;
+   shortDescription?: string;
+  longDescription?: string;
 }
 
 export interface CreateFieldInput {
@@ -122,7 +124,8 @@ export async function getTemplateFields(
   templatePathOrId: string
 ): Promise<TemplateFieldMeta[]> {
   type NV = { name?: string; value?: string };
-  type FieldNode = { name?: string; fields?: { nodes?: NV[] } };
+  type FieldNode = { name?: string; fields?: { nodes?: NV[] }; shortdescription?: { value?: string };
+  longdescription?: { value?: string }; };
   type SectionNode = { name?: string; children?: { nodes?: FieldNode[] } };
   type G = { item?: { children?: { nodes?: SectionNode[] } } };
 
@@ -154,6 +157,8 @@ export async function getTemplateFields(
           source: meta["source"],
           shared: (meta["shared"] || "").toLowerCase() === "1",
           unversioned: (meta["unversioned"] || "").toLowerCase() === "1",
+          shortDescription: f?.shortdescription?.value || "",
+        longDescription: f?.longdescription?.value || "",
         });
       }
     }
