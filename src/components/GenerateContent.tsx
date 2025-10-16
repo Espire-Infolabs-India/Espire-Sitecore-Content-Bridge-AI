@@ -80,10 +80,12 @@ export default function GenerateContent({
   appContext,
   client,
   selectedTemplateData,
+  selectedFile,
 }: {
   appContext: { resourceAccess?: Array<{ context?: { preview?: string } }> };
   client: ClientSDK | null;
   selectedTemplateData: ExtractedItem | null;
+  selectedFile: any;
 }) {
   const sitecoreContextId =
     appContext?.resourceAccess?.[0]?.context?.preview ?? "";
@@ -91,6 +93,9 @@ export default function GenerateContent({
   const [renderings, setRenderings] = useState<RenderingFromXml[]>([]);
   const [nameMap, setNameMap] = useState<Record<string, RenderingInfo>>({});
   const [namesReady, setNamesReady] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorAlert, setErrorAlert] = useState('');
+  
 
   const [activeRenderingId, setActiveRenderingId] = useState<string>("");
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
@@ -181,11 +186,52 @@ export default function GenerateContent({
     if (!templateClean) return;
 
     const tFields = await getTemplateFields(client, sitecoreContextId, templateClean);
-    setFields(tFields);
+    console.log('_______________________tFields',tFields);
+    let contentSummary = await generateContentSummary(tFields);
+    console.log('_______________________contentSummary after ',contentSummary.summary.result);
+
+    setFields(contentSummary.summary.result);
 
     const init: FormValues = {};
     for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
     setFormValues(init);
+  };
+
+  const generateContentSummary = async (tFields:any) => {
+    //setLoading(true);
+    const formData = new FormData();
+    formData.append("tFields", JSON.stringify(tFields));
+    formData.append("model", "custom");
+    formData.append("pdf", selectedFile);
+
+    try {
+      const res = await fetch("/api/generate-summary", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res?.status == 200) {
+        const data = await res.json();
+        console.log('_________________generateContentSummary', data);
+        return data;
+        //setResult(data);
+      } else {
+        setErrorAlert(
+          "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
+        );
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return [];
+      }
+    } catch (err) {
+      //setCancel();
+      //setFirstPage(true);
+      setErrorAlert(
+        "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const grouped = useMemo(() => {
@@ -198,6 +244,7 @@ export default function GenerateContent({
   }, [fields]);
 
   const renderInput = (f: TemplateFieldMeta) => {
+    console.log('fields values',f);
     const k = f.name;
     const v = formValues[k];
     const set = (nv: string | boolean) =>
@@ -292,7 +339,7 @@ export default function GenerateContent({
         return (
           <input
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -363,7 +410,6 @@ export default function GenerateContent({
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <h1 className="text-3xl font-extrabold tracking-tight">Screen 3</h1>
-
       <Card
         title="Generate Content"
         subtitle={
@@ -374,7 +420,6 @@ export default function GenerateContent({
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: renderings list */}
         <Card title="Renderings" subtitle="Click a rendering to load its fields">
           {!namesReady ? (
             <div className="space-y-2">
@@ -419,7 +464,6 @@ export default function GenerateContent({
           )}
         </Card>
 
-        {/* Right: fields & create */}
         <div className="lg:col-span-2 space-y-6">
           {fields.length > 0 ? (
             <>

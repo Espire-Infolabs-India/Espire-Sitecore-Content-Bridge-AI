@@ -19,6 +19,7 @@ export interface RenderingInfo {
 }
 
 export interface TemplateFieldMeta {
+  value: string | number | readonly string[] | undefined;
   section: string;
   name: string;
   type: string;
