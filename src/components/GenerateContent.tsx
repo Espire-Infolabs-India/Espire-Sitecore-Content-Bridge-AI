@@ -108,7 +108,11 @@ export default function GenerateContent({
   const [newItemName, setNewItemName] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>("");
-  const [created, setCreated] = useState<null | { itemId: string; name: string; path: string }>(null);
+  const [created, setCreated] = useState<null | {
+    itemId: string;
+    name: string;
+    path: string;
+  }>(null);
 
   // Parse XML & resolve ALL names; render chips only when all are ready
   useEffect(() => {
@@ -121,7 +125,11 @@ export default function GenerateContent({
     setDsLocation("");
     setNamesReady(false);
 
-    if (!client || !sitecoreContextId || !selectedTemplateData?.finalRenderings) {
+    if (
+      !client ||
+      !sitecoreContextId ||
+      !selectedTemplateData?.finalRenderings
+    ) {
       setNamesReady(true);
       return;
     }
@@ -134,7 +142,9 @@ export default function GenerateContent({
       return;
     }
 
-    const guids = Array.from(new Set(list.map((r) => normalizeGuid(r.componentId))));
+    const guids = Array.from(
+      new Set(list.map((r) => normalizeGuid(r.componentId)))
+    );
 
     (async () => {
       const results = await Promise.allSettled(
@@ -179,7 +189,10 @@ export default function GenerateContent({
 
     // Clean the template value: remove anything after | and strip quotes
     const templateRaw = info.datasourceTemplateValue || "";
-    const templateClean = templateRaw.split("|")[0].trim().replace(/^['"]|['"]$/g, "");
+    const templateClean = templateRaw
+      .split("|")[0]
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
     setDsTemplate(templateClean);
     setDsLocation(info.datasourceLocation || "");
 
@@ -384,7 +397,11 @@ export default function GenerateContent({
       setSaving(true);
 
       // Resolve template id from cleaned template path/ID
-      const templateId = await resolveTemplateId(client, sitecoreContextId, dsTemplate);
+      const templateId = await resolveTemplateId(
+        client,
+        sitecoreContextId,
+        dsTemplate
+      );
 
       // Build fields payload from form
       const fieldsPayload = toCreateFields(formValues, fields);
@@ -405,7 +422,9 @@ export default function GenerateContent({
     }
   };
 
-  const selectedInfo = activeRenderingId ? nameMap[activeRenderingId] : undefined;
+  const selectedInfo = activeRenderingId
+    ? nameMap[activeRenderingId]
+    : undefined;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -440,10 +459,18 @@ export default function GenerateContent({
                     `Rendering: ${info.name}`,
                     `Placeholder: ${r.placeholder}`,
                     `Path: ${info.path || "-"}`,
-                    `Datasource Template: ${dsTemplate || info.datasourceTemplateValue || "-"}`,
-                    `Datasource Location: ${dsLocation || info.datasourceLocation || "-"}`,
-                    selectedTemplateData ? `Template: ${selectedTemplateData.name}` : "",
-                    selectedTemplateData ? `Page Item ID: ${selectedTemplateData.itemID}` : "",
+                    `Datasource Template: ${
+                      dsTemplate || info.datasourceTemplateValue || "-"
+                    }`,
+                    `Datasource Location: ${
+                      dsLocation || info.datasourceLocation || "-"
+                    }`,
+                    selectedTemplateData
+                      ? `Template: ${selectedTemplateData.name}`
+                      : "",
+                    selectedTemplateData
+                      ? `Page Item ID: ${selectedTemplateData.itemID}`
+                      : "",
                   ]
                     .filter(Boolean)
                     .join("\n");
@@ -487,11 +514,20 @@ export default function GenerateContent({
                         <label key={`${section}/${i}`} className="block">
                           <div className="text-xs mb-1">
                             <span className="font-semibold">{f.name}</span>{" "}
-                            <span className="text-gray-500">({f.type || "Text"})</span>
+                            <span className="text-gray-500">
+                              ({f.type || "Text"})
+                            </span>
                             {f.source ? (
                               <span className="text-gray-400">{` — ${f.source}`}</span>
                             ) : null}
                           </div>
+                          {/* 👇 add this line */}
+                          {f.longDescription || f.shortDescription ? (
+                            <div className="text-[11px] text-gray-600 mb-2 leading-snug">
+                              Help Text:{" "}
+                              {f.longDescription || f.shortDescription}
+                            </div>
+                          ) : null}
                           {renderInput(f)}
                         </label>
                       ))}
@@ -502,7 +538,9 @@ export default function GenerateContent({
                 {/* Create item controls */}
                 <div className="mt-4 flex items-end gap-3">
                   <div className="flex-1">
-                    <label className="block text-xs font-semibold mb-1">Item Name</label>
+                    <label className="block text-xs font-semibold mb-1">
+                      Item Name
+                    </label>
                     <input
                       className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                       value={newItemName}
@@ -520,11 +558,13 @@ export default function GenerateContent({
                   </button>
                 </div>
 
-                {saveError && <div className="text-sm text-red-600 mt-2">{saveError}</div>}
+                {saveError && (
+                  <div className="text-sm text-red-600 mt-2">{saveError}</div>
+                )}
                 {created && (
                   <div className="text-sm text-green-700 mt-2">
-                    Created: <strong>{created.name}</strong>{" "}
-                    (<code>{created.itemId}</code>) — {created.path}
+                    Created: <strong>{created.name}</strong> (
+                    <code>{created.itemId}</code>) — {created.path}
                   </div>
                 )}
               </Card>
