@@ -3,7 +3,7 @@
 import '../styles/globals.css';
 import { useEffect, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
-import FileUpload from "./FileUpload";
+import { FileUpload } from "./FileUpload";
 interface MediaItem {
   id: string;
   name: string;
@@ -108,7 +108,8 @@ export default function GetMediaItems({
         Select Media
       </button>
 
-      <FileUpload />
+      <FileUpload appContext={appContext}
+              client={client}/>
 
       {selectedMedia && (
         <div className="mt-4 flex items-center space-x-3">

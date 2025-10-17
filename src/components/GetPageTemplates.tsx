@@ -4,7 +4,7 @@ import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import { getPageTemplates } from "../utils/gqlQueries/getPageTemplates";
 import { parseRenderingsFromXml } from "../utils/lib/parseRenderingsFromXml";
 import GenerateContent from "./GenerateContent";
-
+import GetMediaItems from "./GetMediaItems";
 interface Field {
   name?: string;
   value?: string;
@@ -132,6 +132,14 @@ export default function GetPageTemplates({
       ) : (
         <p>Loading templates...</p>
       )}
+
+       <GetMediaItems
+              appContext={appContext}
+              client={client}
+               
+              //onMediaSelect={(media) => console.log("Selected Media:", media)}
+            />
     </div>
+    
   );
 }

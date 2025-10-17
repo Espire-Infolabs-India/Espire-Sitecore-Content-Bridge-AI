@@ -4,6 +4,7 @@ import path from 'path';
 
 export async function POST(req: Request) {
   try {
+    
     const formData = await req.formData();
     const file = formData.get('file') as File;
 
