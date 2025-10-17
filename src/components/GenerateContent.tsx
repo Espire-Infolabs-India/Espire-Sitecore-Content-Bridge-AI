@@ -354,7 +354,6 @@ export default function GenerateContent({
         appContext={appContext}
         client={client}
          onMediaSelect={(media) => {setFormValues((prev) => ({...prev,[f.name]: media.id, }));}}
-        //onMediaSelect={(media) => console.log("Selected Media:", media)}
       />
           </>
         );
@@ -397,8 +396,7 @@ export default function GenerateContent({
     return list;
   }
 
-  const onSaveDatasource = async () => {
-    debugger
+  const onSaveDatasource = async () => {    
     setSaveError("");
     setCreated(null);
 

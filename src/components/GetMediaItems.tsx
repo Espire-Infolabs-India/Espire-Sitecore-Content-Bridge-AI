@@ -4,6 +4,8 @@ import '../styles/globals.css';
 import { useEffect, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 
+import { GET_MEDIAPATH } from "../utils/gqlQueries/mediaselection";
+
 interface MediaItem {
   id: string;
   name: string;
@@ -35,32 +37,13 @@ export default function GetMediaItems({
       console.error("❌ Sitecore Context ID not found.");
       return;
     }
-
-    // ✅ Build query dynamically using the current path
-    const query = `
-      query {
-        item(where: { path: "${path}" }) {
-          name
-          path
-          itemId
-          children {
-            nodes {
-              itemId
-              name
-              path
-              template {
-                name
-              }
-            }
-          }
-        }
-      }
-    `;
-
+    console.log("Fetching media items from path:", path);
     await client?.mutate("xmc.authoring.graphql", {
       params: {
         query: { sitecoreContextId },
-        body: { query },
+        body: {
+          query: GET_MEDIAPATH(path)
+        },
       },
       onSuccess: (data: any) => {
         const nodes = data?.data?.data?.item?.children?.nodes;
@@ -113,7 +96,7 @@ export default function GetMediaItems({
           {(() => {
             const mediaUrl =
               selectedMedia.template === "Media folder"
-                ? "https://xmc-espireinfol3993-espirestartef06-dev.sitecorecloud.io/sitecore/shell/-/icon/Applications/32x32/folder.png.aspx?rev=b1625fff-bfe4-4c43-9b56-facb8cc34ee0&la=en"
+                ? "https://xmc-espireinfol3993-espirestartef06-dev.sitecorecloud.io/sitecore/shell/Applications/Content%20Manager/-/media/7992E405A9BA49E08C87C88060756731.ashx?bc=White&db=master&h=128&mw=640&thn=1&ts=404797cf-e9ec-421d-b094-4604e5f6c74f&udi=1"
                 : `https://xmc-espireinfol3993-espirestartef06-dev.sitecorecloud.io/sitecore/shell/themes/standard/-/media/${selectedMedia.id}.ashx?h=100&thn=1&w=100`;
 
             return (
@@ -172,7 +155,7 @@ export default function GetMediaItems({
               {mediaItems.map((media) => {
                 const mediaUrl =
                   media.template === "Media folder"
-                    ? "https://xmc-espireinfol3993-espirestartef06-dev.sitecorecloud.io/sitecore/shell/-/icon/Applications/32x32/folder.png.aspx?rev=b1625fff-bfe4-4c43-9b56-facb8cc34ee0&la=en"
+                    ? "https://xmc-espireinfol3993-espirestartef06-dev.sitecorecloud.io/sitecore/shell/Applications/Content%20Manager/-/media/7992E405A9BA49E08C87C88060756731.ashx?bc=White&db=master&h=128&mw=640&thn=1&ts=404797cf-e9ec-421d-b094-4604e5f6c74f&udi=1"
                     : `https://xmc-espireinfol3993-espirestartef06-dev.sitecorecloud.io/sitecore/shell/themes/standard/-/media/${media.id}.ashx?h=100&thn=1&w=100`;
 
                 return (
