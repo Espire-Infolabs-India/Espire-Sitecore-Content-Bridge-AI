@@ -343,6 +343,9 @@ export default function GenerateContent({
         case "Image":        
           value = `<image mediaid="${raw}" />`;
           break;
+        case "General Link":        
+          value = `<link linktype="external" url="${raw}" anchor="" target="" />`;
+          break;
         default:
           value = String(raw ?? "");
       }
