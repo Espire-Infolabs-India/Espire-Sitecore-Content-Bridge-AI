@@ -4,6 +4,7 @@ query getItemIdByPath($path: String!) {
     itemId
     name
     displayName
+    path
   }
 }
 `;
