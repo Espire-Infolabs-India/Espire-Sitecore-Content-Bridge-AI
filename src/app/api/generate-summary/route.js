@@ -91,8 +91,15 @@ export async function POST(req) {
       if (file?.mimetype === "application/pdf") {
         const filePath = file.filepath;
         const fileName = file.newFilename;
+        let BASE_URL = "http://localhost:3000";
+        
+        if(req.headers["x-forwarded-proto"]){
+          BASE_URL = req.headers["x-forwarded-proto"];
+        }else{
+          BASE_URL = req.headers.origin;
+        }
 
-        PDFLink = `${process.env.BASE_URL || "http://localhost:3000"}/images/uploads/${fileName}`;
+        PDFLink = `${BASE_URL}/images/uploads/${fileName}`;
 
         const pdfContent = await readPDFContent(filePath);
         const truncatedContent = pdfContent.slice(0, 30000);
