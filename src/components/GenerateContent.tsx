@@ -483,8 +483,8 @@ export default function GenerateContent({
                       {section || "Fields"}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {items.map((f) => (
-                        <label key={`${section}/${f.name}`} className="block">
+                      {items.map((f, i) => (
+                        <label key={`${section}/${i}`} className="block">
                           <div className="text-xs mb-1">
                             <span className="font-semibold">{f.name}</span>{" "}
                             <span className="text-gray-500">({f.type || "Text"})</span>

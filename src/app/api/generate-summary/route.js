@@ -44,20 +44,20 @@ export async function POST(req) {
   });
 
   return new Promise((resolve) => {
-      resolve(
-        NextResponse.json({
-          summary: {
-              "result": [
-                  {
-                      "display_name": "Title",
-                      "reference": "Slides.Title",
-                      "value": "test value coming from ai"
-                  }
-              ]
+    //   resolve(
+    //     NextResponse.json({
+    //       summary: {
+    //           "result": [
+    //               {
+    //                   "display_name": "Title",
+    //                   "reference": "Slides.Title",
+    //                   "value": "test value coming from ai"
+    //               }
+    //           ]
               
-          },
-        })
-    );
+    //       },
+    //     })
+    // );
     // static code end
 
     const nodeReq = toNodeRequest(req);
@@ -83,7 +83,21 @@ export async function POST(req) {
           newItem.section = item.section;
           return newItem;
       });
+
       console.log('___________________JSON.stringify_____________________',finalFields);
+      
+        resolve(
+            NextResponse.json({
+              summary: {
+                  "result": finalFields
+                  
+              },
+            })
+        );
+    // static code end
+      
+      return false;
+      
 
       const file = Array.isArray(files.pdf) ? files.pdf[0] : files.pdf;
       let PDFLink = "";
