@@ -22,6 +22,7 @@ export default function DocumentImporter({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<UploadedFile | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showPageTemplates, setShowPageTemplates] = useState(false);
@@ -38,6 +39,7 @@ export default function DocumentImporter({
     if (!f) return;
     setLoading(true);
     try {
+      setSelectedFile(f);
       const dataUrl = await readFileAsBase64(f);
       const base64 = String(dataUrl).split(",")[1] || "";
       setFile({
@@ -78,7 +80,7 @@ export default function DocumentImporter({
   };
 
   if (showPageTemplates) {
-    return <GetPageTemplates appContext={appContext} client={client} />;
+    return <GetPageTemplates appContext={appContext} client={client} selectedFile={selectedFile} />;
   }
 
   return (
