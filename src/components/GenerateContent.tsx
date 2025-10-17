@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import GetMediaItems from "./GetMediaItems";
 
 import {
   getTemplateFields,
@@ -281,12 +282,21 @@ export default function GenerateContent({
       case "Image":
       case "File":
         return (
-          <input
-            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            placeholder={f.source ? `source: ${f.source}` : ""}
-            value={String(v ?? "")}
-            onChange={(e) => set(e.target.value)}
-          />
+          <>
+            <input
+        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 hidden"
+        placeholder={f.source ? `source: ${f.source}` : ""}
+        value={String(v ?? "")}
+        onChange={(e) => set(e.target.value)}
+      />
+
+      <GetMediaItems
+        appContext={appContext}
+        client={client}
+         onMediaSelect={(media) => {setFormValues((prev) => ({...prev,[f.name]: media.id, }));}}
+        //onMediaSelect={(media) => console.log("Selected Media:", media)}
+      />
+          </>
         );
       default:
         return (
@@ -303,6 +313,8 @@ export default function GenerateContent({
   function toCreateFields(values: FormValues, metas: TemplateFieldMeta[]) {
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
+
+
       const raw = values[m.name];
       if (raw === undefined) continue;
 
@@ -310,6 +322,9 @@ export default function GenerateContent({
       switch (m.type) {
         case "Checkbox":
           value = (raw ? "1" : "0") as string; // Sitecore accepts 1/0 for checkbox
+          break;
+        case "Image":        
+          value = `<image mediaid="${raw}" />`;
           break;
         default:
           value = String(raw ?? "");
@@ -320,6 +335,7 @@ export default function GenerateContent({
   }
 
   const onSaveDatasource = async () => {
+    debugger
     setSaveError("");
     setCreated(null);
 

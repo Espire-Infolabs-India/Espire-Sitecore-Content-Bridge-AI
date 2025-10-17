@@ -1,6 +1,8 @@
-@import "tailwindcss/preflight";
-@tailwind utilities;
 
+@tailwind utilities;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Minimal global styles for the marketplace starter app */
 :root {
