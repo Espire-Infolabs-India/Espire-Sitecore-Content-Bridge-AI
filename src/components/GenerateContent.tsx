@@ -167,7 +167,7 @@ export default function GenerateContent({
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
   // Click → load template fields from datasource template
-  const onClickRendering = async (componentIdRaw: string) => {
+  const onClickRendering = async (componentIdRaw: string, compName:any) => {
     if (!client || !sitecoreContextId) return;
     const componentId = normalizeGuid(componentIdRaw);
 
@@ -201,9 +201,13 @@ export default function GenerateContent({
     const tFields = await getTemplateFields(client, sitecoreContextId, templateClean);
     console.log('_______________________tFields',tFields);
     let contentSummary = await generateContentSummary(tFields);
+    let currentTimeStamp = Date.now().toString().slice(-6);
+    let compNameUnique = compName?.toLowerCase()+'_'+currentTimeStamp;
+    setNewItemName(compNameUnique);
     console.log('_______________________contentSummary after ',contentSummary.summary.result);
 
     setFields(contentSummary.summary.result);
+    
 
     const init: FormValues = {};
     for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
@@ -261,7 +265,7 @@ export default function GenerateContent({
     const k = f.name;
     const v = formValues[k];
     const set = (nv: string | boolean) =>
-      setFormValues((s) => ({ ...s, [k]: nv }));
+    setFormValues((s) => ({ ...s, [k]: nv }));
 
     switch (f.type) {
       case "Checkbox":
@@ -351,7 +355,8 @@ export default function GenerateContent({
       default:
         return (
           <input
-            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dynamic-input"
+            name={f.name}
             value={f.value}
             onChange={(e) => set(e.target.value)}
           />
@@ -361,6 +366,7 @@ export default function GenerateContent({
 
   /** Convert current form to simple [{name, value}] list for mutation */
   function toCreateFields(values: FormValues, metas: TemplateFieldMeta[]) {
+    console.log('__________toCreateFields______',values, metas);
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
       const raw = values[m.name];
@@ -404,6 +410,23 @@ export default function GenerateContent({
       );
 
       // Build fields payload from form
+      console.log('______________formValues',formValues);
+      console.log('______________fields',fields);
+
+      type InputData = {
+        name: string;
+        value: string;
+      };
+
+     
+      // const inputs = document.querySelectorAll<HTMLInputElement>('.dynamic-input');
+      // const data: InputData[] = Array.from(inputs).map((input) => ({
+      //   name: input.name || '',        // fallback if name not set
+      //   value: input.value.trim(),
+      // }));
+      // console.log('______________getDynamicInputValues',data);
+
+
       const fieldsPayload = toCreateFields(formValues, fields);
 
       // Create the item (fields are inlined inside the mutation)
@@ -481,7 +504,7 @@ export default function GenerateContent({
                         label={info.name}
                         title={tooltip}
                         active={activeRenderingId === guid}
-                        onClick={() => onClickRendering(guid)}
+                        onClick={() => onClickRendering(guid,info.name)}
                       />
                     </li>
                   );

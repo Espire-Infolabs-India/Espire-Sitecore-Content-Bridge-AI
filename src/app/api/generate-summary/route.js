@@ -79,6 +79,7 @@ export async function POST(req) {
       let finalFields = tFields?.map((item) => {
           let newItem = {};
           newItem.display_name = item?.name;
+          newItem.name = item?.name;
           newItem.type = item?.name;
           newItem.section = item.section;
           return newItem;
