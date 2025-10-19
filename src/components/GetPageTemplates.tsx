@@ -37,9 +37,11 @@ interface ExtractedItem {
 export default function GetPageTemplates({
   appContext,
   client,
+  selectedFile
 }: {
   appContext: any;
   client: ClientSDK | null;
+  selectedFile: any;
 }) {
   const [extractedData, setExtractedData] = useState<ExtractedItem[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -78,12 +80,13 @@ export default function GetPageTemplates({
       },
     });
   };
+
   const handleRadioChange = (item: ExtractedItem) => {
-    console.log("Item Dataa :::::;", item);
     setSelectedTemplateData(item);
     setSelectedName(item.name);
     setGenerateContent(true);
   };
+
   useEffect(() => {
     makeGraphQLQuery();
   }, []);
@@ -94,6 +97,7 @@ export default function GetPageTemplates({
         appContext={appContext}
         client={client}
         selectedTemplateData={selectedTemplateData}
+        selectedFile={selectedFile}
       />
     );
   }

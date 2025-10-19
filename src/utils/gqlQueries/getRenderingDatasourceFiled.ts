@@ -11,6 +11,12 @@ query getRenderingDatasourceFiled($where: ItemQueryInput!) {
           nodes {
             itemId
             name
+             shortdescription: field(name: "__Short description") {
+              value
+            }
+            longdescription: field(name: "__Long description") {
+              value
+            }
             fields(excludeStandardFields: false) {  # include Type/Source/Shared/Unversioned
               nodes { name value }
             }

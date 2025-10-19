@@ -83,10 +83,12 @@ export default function GenerateContent({
   appContext,
   client,
   selectedTemplateData,
+  selectedFile,
 }: {
   appContext: { resourceAccess?: Array<{ context?: { preview?: string } }> };
   client: ClientSDK | null;
   selectedTemplateData: ExtractedItem | null;
+  selectedFile: any;
 }) {
   const sitecoreContextId =
     appContext?.resourceAccess?.[0]?.context?.preview ?? "";
@@ -94,6 +96,9 @@ export default function GenerateContent({
   const [renderings, setRenderings] = useState<RenderingFromXml[]>([]);
   const [nameMap, setNameMap] = useState<Record<string, RenderingInfo>>({});
   const [namesReady, setNamesReady] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorAlert, setErrorAlert] = useState('');
+  
 
   const [activeRenderingId, setActiveRenderingId] = useState<string>("");
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
@@ -106,7 +111,11 @@ export default function GenerateContent({
   const [newItemName, setNewItemName] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>("");
-  const [created, setCreated] = useState<null | { itemId: string; name: string; path: string }>(null);
+  const [created, setCreated] = useState<null | {
+    itemId: string;
+    name: string;
+    path: string;
+  }>(null);
 
   // Base templates (debug)
   const [baseTemplates, setBaseTemplates] = useState<
@@ -140,7 +149,11 @@ export default function GenerateContent({
     setDsLocation("");
     setNamesReady(false);
 
-    if (!client || !sitecoreContextId || !selectedTemplateData?.finalRenderings) {
+    if (
+      !client ||
+      !sitecoreContextId ||
+      !selectedTemplateData?.finalRenderings
+    ) {
       setNamesReady(true);
       return;
     }
@@ -153,7 +166,9 @@ export default function GenerateContent({
       return;
     }
 
-    const guids = Array.from(new Set(list.map((r) => normalizeGuid(r.componentId))));
+    const guids = Array.from(
+      new Set(list.map((r) => normalizeGuid(r.componentId)))
+    );
 
     (async () => {
       const results = await Promise.allSettled(
@@ -293,18 +308,62 @@ export default function GenerateContent({
 
     // Clean the template value: remove anything after | and strip quotes
     const templateRaw = info.datasourceTemplateValue || "";
-    const templateClean = templateRaw.split("|")[0].trim().replace(/^['"]|['"]$/g, "");
+    const templateClean = templateRaw
+      .split("|")[0]
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
     setDsTemplate(templateClean);
     setDsLocation(info.datasourceLocation || "");
 
     if (!templateClean) return;
 
     const tFields = await getTemplateFields(client, sitecoreContextId, templateClean);
-    setFields(tFields);
+    console.log('_______________________tFields',tFields);
+    let contentSummary = await generateContentSummary(tFields);
+    console.log('_______________________contentSummary after ',contentSummary.summary.result);
+
+    setFields(contentSummary.summary.result);
 
     const init: FormValues = {};
     for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
     setFormValues(init);
+  };
+
+  const generateContentSummary = async (tFields:any) => {
+    //setLoading(true);
+    const formData = new FormData();
+    formData.append("tFields", JSON.stringify(tFields));
+    formData.append("model", "custom");
+    formData.append("pdf", selectedFile);
+
+    try {
+      const res = await fetch("/api/generate-summary", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res?.status == 200) {
+        const data = await res.json();
+        console.log('_________________generateContentSummary', data);
+        return data;
+        //setResult(data);
+      } else {
+        setErrorAlert(
+          "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
+        );
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return [];
+      }
+    } catch (err) {
+      //setCancel();
+      //setFirstPage(true);
+      setErrorAlert(
+        "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const grouped = useMemo(() => {
@@ -317,6 +376,7 @@ export default function GenerateContent({
   }, [fields]);
 
   const renderInput = (f: TemplateFieldMeta) => {
+    console.log('fields values',f);
     const k = f.name;
     const v = formValues[k];
     const set = (nv: string | boolean) =>
@@ -411,7 +471,7 @@ export default function GenerateContent({
         return (
           <input
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -455,9 +515,17 @@ export default function GenerateContent({
     try {
       setSaving(true);
 
-      const templateId = await resolveTemplateId(client, sitecoreContextId, dsTemplate);
+      // Resolve template id from cleaned template path/ID
+      const templateId = await resolveTemplateId(
+        client,
+        sitecoreContextId,
+        dsTemplate
+      );
+
+      // Build fields payload from form
       const fieldsPayload = toCreateFields(formValues, fields);
 
+      // Create the item (fields are inlined inside the mutation)
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
         parentId: PARENT_ID,
@@ -473,14 +541,13 @@ export default function GenerateContent({
     }
   };
 
-  const selectedInfo = activeRenderingId ? nameMap[activeRenderingId] : undefined;
+  const selectedInfo = activeRenderingId
+    ? nameMap[activeRenderingId]
+    : undefined;
 
-  /* ======================= RENDER ======================= */
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <h1 className="text-3xl font-extrabold tracking-tight">Screen 3</h1>
-
-      {/* 1) Top card with Template + Page Item ID */}
       <Card
         title="Generate Content"
         subtitle={
@@ -519,7 +586,6 @@ export default function GenerateContent({
 
       {/* 3) Renderings UI */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: renderings list */}
         <Card title="Renderings" subtitle="Click a rendering to load its fields">
           {!namesReady ? (
             <div className="space-y-2">
@@ -540,10 +606,18 @@ export default function GenerateContent({
                     `Rendering: ${info.name}`,
                     `Placeholder: ${r.placeholder}`,
                     `Path: ${info.path || "-"}`,
-                    `Datasource Template: ${dsTemplate || info.datasourceTemplateValue || "-"}`,
-                    `Datasource Location: ${dsLocation || info.datasourceLocation || "-"}`,
-                    selectedTemplateData ? `Template: ${selectedTemplateData.name}` : "",
-                    selectedTemplateData ? `Page Item ID: ${selectedTemplateData.itemID}` : "",
+                    `Datasource Template: ${
+                      dsTemplate || info.datasourceTemplateValue || "-"
+                    }`,
+                    `Datasource Location: ${
+                      dsLocation || info.datasourceLocation || "-"
+                    }`,
+                    selectedTemplateData
+                      ? `Template: ${selectedTemplateData.name}`
+                      : "",
+                    selectedTemplateData
+                      ? `Page Item ID: ${selectedTemplateData.itemID}`
+                      : "",
                   ]
                     .filter(Boolean)
                     .join("\n");
@@ -564,7 +638,6 @@ export default function GenerateContent({
           )}
         </Card>
 
-        {/* Right: fields & create (datasource template) */}
         <div className="lg:col-span-2 space-y-6">
           {fields.length > 0 ? (
             <>
@@ -584,15 +657,24 @@ export default function GenerateContent({
                       {section || "Fields"}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {items.map((f) => (
-                        <label key={`${section}/${f.name}`} className="block">
+                      {items.map((f, i) => (
+                        <label key={`${section}/${i}`} className="block">
                           <div className="text-xs mb-1">
                             <span className="font-semibold">{f.name}</span>{" "}
-                            <span className="text-gray-500">({f.type || "Text"})</span>
+                            <span className="text-gray-500">
+                              ({f.type || "Text"})
+                            </span>
                             {f.source ? (
                               <span className="text-gray-400">{` — ${f.source}`}</span>
                             ) : null}
                           </div>
+                          {/* 👇 add this line */}
+                          {f.longDescription || f.shortDescription ? (
+                            <div className="text-[11px] text-gray-600 mb-2 leading-snug">
+                              Help Text:{" "}
+                              {f.longDescription || f.shortDescription}
+                            </div>
+                          ) : null}
                           {renderInput(f)}
                         </label>
                       ))}
@@ -603,7 +685,9 @@ export default function GenerateContent({
                 {/* Create item controls */}
                 <div className="mt-4 flex items-end gap-3">
                   <div className="flex-1">
-                    <label className="block text-xs font-semibold mb-1">Item Name</label>
+                    <label className="block text-xs font-semibold mb-1">
+                      Item Name
+                    </label>
                     <input
                       className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                       value={newItemName}
@@ -621,11 +705,13 @@ export default function GenerateContent({
                   </button>
                 </div>
 
-                {saveError && <div className="text-sm text-red-600 mt-2">{saveError}</div>}
+                {saveError && (
+                  <div className="text-sm text-red-600 mt-2">{saveError}</div>
+                )}
                 {created && (
                   <div className="text-sm text-green-700 mt-2">
-                    Created: <strong>{created.name}</strong>{" "}
-                    (<code>{created.itemId}</code>) — {created.path}
+                    Created: <strong>{created.name}</strong> (
+                    <code>{created.itemId}</code>) — {created.path}
                   </div>
                 )}
               </Card>
