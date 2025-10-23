@@ -167,7 +167,7 @@ export default function GenerateContent({
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
   // Click → load template fields from datasource template
-  const onClickRendering = async (componentIdRaw: string) => {
+  const onClickRendering = async (componentIdRaw: string, compName:any) => {
     if (!client || !sitecoreContextId) return;
     const componentId = normalizeGuid(componentIdRaw);
 
@@ -201,9 +201,19 @@ export default function GenerateContent({
     const tFields = await getTemplateFields(client, sitecoreContextId, templateClean);
     console.log('_______________________tFields',tFields);
     let contentSummary = await generateContentSummary(tFields);
-    console.log('_______________________contentSummary after ',contentSummary.summary.result);
+    let currentTimeStamp = Date.now().toString().slice(-6);
+    let compNameUnique = compName?.toLowerCase()+'_'+currentTimeStamp;
+    setNewItemName(compNameUnique);
 
-    setFields(contentSummary.summary.result);
+    console.log('_______________________contentSummary after 0 ',contentSummary?.result);
+    let contentSummary1 = contentSummary?.result?.map((item: { name: any; reference: any; }) => {
+      item.name = item.reference;
+      return item;
+    });
+    console.log('_______________________contentSummary after ',contentSummary1);
+
+    setFields(contentSummary1);
+    
 
     const init: FormValues = {};
     for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
@@ -211,23 +221,34 @@ export default function GenerateContent({
   };
 
   const generateContentSummary = async (tFields:any) => {
-    //setLoading(true);
-    const formData = new FormData();
-    formData.append("tFields", JSON.stringify(tFields));
-    formData.append("model", "custom");
-    formData.append("pdf", selectedFile);
-
     try {
-      const res = await fetch("/api/generate-summary", {
+      //setLoading(true);
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const uploadRes = await fetch("/api/generate-summary", {
         method: "POST",
         body: formData,
       });
 
-      if (res?.status == 200) {
-        const data = await res.json();
-        console.log('_________________generateContentSummary', data);
-        return data;
-        //setResult(data);
+      if (!uploadRes.ok) throw new Error("File upload failed");
+      const { blob_url } = await uploadRes.json();
+      
+      // 2️⃣ Send to third-party API
+      const thirdPartyRes = await fetch("/api/chat-bot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blob_url, tFields }),
+      });
+
+      if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
+
+      const data = await thirdPartyRes.json();
+      console.log("Third-party response:", data);
+      console.log("Uploaded PDF link:", blob_url);
+      
+      if (thirdPartyRes?.status == 200) {
+        return data?.data;
       } else {
         setErrorAlert(
           "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
@@ -236,8 +257,6 @@ export default function GenerateContent({
         return [];
       }
     } catch (err) {
-      //setCancel();
-      //setFirstPage(true);
       setErrorAlert(
         "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
       );
@@ -261,7 +280,7 @@ export default function GenerateContent({
     const k = f.name;
     const v = formValues[k];
     const set = (nv: string | boolean) =>
-      setFormValues((s) => ({ ...s, [k]: nv }));
+    setFormValues((s) => ({ ...s, [k]: nv }));
 
     switch (f.type) {
       case "Checkbox":
@@ -280,6 +299,7 @@ export default function GenerateContent({
       case "Multi-Line Text":
         return (
           <textarea
+            name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={4}
             value={String(v ?? "")}
@@ -290,6 +310,7 @@ export default function GenerateContent({
       case "Number":
         return (
           <input
+            name={f.name}
             type="number"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             value={String(v ?? "")}
@@ -299,6 +320,7 @@ export default function GenerateContent({
       case "Date":
         return (
           <input
+            name={f.name}
             type="date"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             value={String(v ?? "")}
@@ -308,6 +330,7 @@ export default function GenerateContent({
       case "Datetime":
         return (
           <input
+            name={f.name}
             type="datetime-local"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             value={String(v ?? "")}
@@ -317,6 +340,7 @@ export default function GenerateContent({
       case "General Link":
         return (
           <input
+            name={f.name}
             type="url"
             placeholder="https://… or internal link"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
@@ -329,6 +353,7 @@ export default function GenerateContent({
       case "Treelist":
         return (
           <textarea
+            name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={2}
             placeholder="IDs/paths comma- or newline-separated"
@@ -342,6 +367,7 @@ export default function GenerateContent({
       case "File":
         return (
           <input
+            name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             placeholder={f.source ? `source: ${f.source}` : ""}
             value={String(v ?? "")}
@@ -351,7 +377,8 @@ export default function GenerateContent({
       default:
         return (
           <input
-            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dynamic-input"
+            name={f.name}
             value={f.value}
             onChange={(e) => set(e.target.value)}
           />
@@ -361,6 +388,7 @@ export default function GenerateContent({
 
   /** Convert current form to simple [{name, value}] list for mutation */
   function toCreateFields(values: FormValues, metas: TemplateFieldMeta[]) {
+    console.log('__________toCreateFields______',values, metas);
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
       const raw = values[m.name];
@@ -404,7 +432,26 @@ export default function GenerateContent({
       );
 
       // Build fields payload from form
+      console.log('______________formValues',formValues);
+      console.log('______________fields',fields);
+
+      type InputData = {
+        name: string;
+        value: string;
+      };
+
+     
+      // const inputs = document.querySelectorAll<HTMLInputElement>('.dynamic-input');
+      // const data: InputData[] = Array.from(inputs).map((input) => ({
+      //   name: input.name || '',        // fallback if name not set
+      //   value: input.value.trim(),
+      // }));
+      // console.log('______________getDynamicInputValues',data);
+
+
       const fieldsPayload = toCreateFields(formValues, fields);
+
+      console.log('______________fieldsPayload',fieldsPayload);
 
       // Create the item (fields are inlined inside the mutation)
       const item = await createItemFromTemplate(client, sitecoreContextId, {
@@ -481,7 +528,7 @@ export default function GenerateContent({
                         label={info.name}
                         title={tooltip}
                         active={activeRenderingId === guid}
-                        onClick={() => onClickRendering(guid)}
+                        onClick={() => onClickRendering(guid,info.name)}
                       />
                     </li>
                   );
