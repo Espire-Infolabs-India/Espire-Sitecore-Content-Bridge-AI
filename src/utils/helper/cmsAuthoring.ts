@@ -4,7 +4,6 @@ import { GET_RENDERING_DATASOURCE_FIELDS } from "../gqlQueries/getRenderingDatas
 import { GET_RENDERING_INFO } from "../gqlQueries/getRenderingInfo";
 import { GET_ITEM_ID_BY_PATH } from "../gqlQueries/getItemIdByPath";
  
-/** ---- Types kept local to this helper ---- */
 type MutateReturn<T> = {
   data?: { data?: T; errors?: Array<{ message?: string }> };
   errors?: Array<{ message?: string }>;
