@@ -3,7 +3,6 @@
 import '../styles/globals.css';
 import { useEffect, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
-
 import { GET_MEDIAPATH } from "../utils/gqlQueries/mediaselection";
 
 import { FileUpload } from "./FileUpload";
@@ -93,6 +92,7 @@ export default function GetMediaItems({
       </button>
 
       <FileUpload appContext={appContext}
+            targetPath=''
               client={client}/>
 
       {selectedMedia && (

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { IncomingForm } from "formidable";
 import fs from "fs";
 import path from "path";
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
+//import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import axios from "axios";
 import { Readable } from "stream";
 
@@ -21,7 +21,8 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 async function readPDFContent(filePath) {
   const dataBuffer = fs.readFileSync(filePath);
-  const data = await pdfParse(dataBuffer);
+  //const data = await pdfParse(dataBuffer);
+  const data = { text: "Mock PDF content for testing purposes." }; // Mocked data
   return data.text;
 }
 

@@ -1,31 +1,47 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { json } from 'stream/consumers';
 
 export async function POST(req: Request) {
-  try {
-    
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
+   try {
+    // ✅ Parse JSON body
+    const { itemPath, token  } = await req.json();
 
-    if (!file) {
-      return NextResponse.json({ status: 'fail', message: 'No file provided.' }, { status: 400 });
-    }
+    const endpointUrl = 'https://xmc-espireinfol3993-espirestartef06-dev.sitecorecloud.io/sitecore/api/authoring/graphql/v1/';
+    const jwt = process.env.SITECORE_JWT!;
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const query = `
+      mutation {
+        uploadMedia(input: { itemPath: "${itemPath}" }) {
+          presignedUploadUrl
+        }
+      }
+    `;
 
-    // Define upload path (e.g., /public/uploads)
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    await fs.mkdir(uploadDir, { recursive: true });
+    const response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt}`,
+      },
+      body: JSON.stringify({ query }),
+    });
 
-    // Save file
-    const filePath = path.join(uploadDir, file.name);
-    await fs.writeFile(filePath, buffer);
+    const data = await response.json();
 
-    return NextResponse.json({ status: 'success', fileName: file.name });
-  } catch (error) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ status: 'fail', error: (error as Error).message }, { status: 500 });
+
+
+    console.log("Avinash   Response from Sitecore GraphQL:", data,JSON.stringify({ query }));
+    const presignedUploadUrl = data?.data?.uploadMedia?.presignedUploadUrl;
+
+    return new Response(JSON.stringify({ presignedUploadUrl }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  } catch (error: any) {
+    console.error('Error generating presigned URL:', error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }
