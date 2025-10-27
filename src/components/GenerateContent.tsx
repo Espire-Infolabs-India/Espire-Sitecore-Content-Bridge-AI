@@ -287,6 +287,7 @@ export default function GenerateContent({
         return (
           <label className="inline-flex items-center gap-2">
             <input
+              name={f.name}
               type="checkbox"
               className="size-4"
               checked={Boolean(v)}
