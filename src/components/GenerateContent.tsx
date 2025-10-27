@@ -286,7 +286,7 @@ export default function GenerateContent({
   }, [client, sitecoreContextId]);
 
   // Click → load template fields from datasource template (right panel)
-  const onClickRendering = async (componentIdRaw: string) => {
+  const onClickRendering = async (componentIdRaw: string, compName: any) => {
     if (!client || !sitecoreContextId) return;
     const componentId = normalizeGuid(componentIdRaw);
 
@@ -406,6 +406,7 @@ export default function GenerateContent({
         return (
           <label className="inline-flex items-center gap-2">
             <input
+              name={f.name}
               type="checkbox"
               className="size-4"
               checked={Boolean(v)}
@@ -616,6 +617,7 @@ export default function GenerateContent({
                 section: "BaseTemplate",
                 name: fieldName,
                 type: fieldType,
+                value: undefined
               };
               return (
                 <label key={`BaseTemplate/${fieldName}-${index}`} className="block">
