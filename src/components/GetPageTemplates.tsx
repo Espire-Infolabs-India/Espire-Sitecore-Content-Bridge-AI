@@ -37,11 +37,15 @@ interface ExtractedItem {
 export default function GetPageTemplates({
   appContext,
   client,
-  selectedFile
+  selectedFile,
+  prompt,
+  brandWebsite,
 }: {
   appContext: any;
   client: ClientSDK | null;
   selectedFile: any;
+  prompt: string | '';
+  brandWebsite: string | '';
 }) {
   const [extractedData, setExtractedData] = useState<ExtractedItem[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -98,6 +102,8 @@ export default function GetPageTemplates({
         client={client}
         selectedTemplateData={selectedTemplateData}
         selectedFile={selectedFile}
+        prompt={prompt}
+        brandWebsite={brandWebsite}
       />
     );
   }

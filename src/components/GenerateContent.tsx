@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 
+
 import {
   getTemplateFields,
   resolveRendering,
@@ -84,11 +85,15 @@ export default function GenerateContent({
   client,
   selectedTemplateData,
   selectedFile,
+  prompt,
+  brandWebsite,
 }: {
   appContext: { resourceAccess?: Array<{ context?: { preview?: string } }> };
   client: ClientSDK | null;
   selectedTemplateData: ExtractedItem | null;
   selectedFile: any;
+  prompt: string | '';
+  brandWebsite: string | '';
 }) {
   const sitecoreContextId =
     appContext?.resourceAccess?.[0]?.context?.preview ?? "";
@@ -105,6 +110,8 @@ export default function GenerateContent({
   const [formValues, setFormValues] = useState<FormValues>({});
   const [dsTemplate, setDsTemplate] = useState<string>("");
   const [dsLocation, setDsLocation] = useState<string>("");
+
+
 
   // Hard-coded parent (as you wanted)
   const PARENT_ID = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
@@ -344,6 +351,8 @@ export default function GenerateContent({
       //setLoading(true);
       const formData = new FormData();
       formData.append("file", selectedFile);
+     
+      
 
       const uploadRes = await fetch("/api/generate-summary", {
         method: "POST",
@@ -357,7 +366,7 @@ export default function GenerateContent({
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blob_url, tFields }),
+        body: JSON.stringify({ blob_url, tFields, prompt: prompt, brandWebsite: brandWebsite }),
       });
 
       if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
@@ -784,6 +793,7 @@ export default function GenerateContent({
           )}
         </div>
       </div>
+      
     </div>
   );
 }
