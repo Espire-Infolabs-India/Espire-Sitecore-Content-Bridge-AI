@@ -9,6 +9,9 @@ import {
   normalizeGuid,
   resolveTemplateId,
   createItemFromTemplate,
+  getBaseTemplatesByTemplateId,
+  getItemByPath,
+  getTemplateDefinitionByPath,
 } from "../utils/helper/cmsAuthoring";
 import type {
   TemplateFieldMeta,
@@ -114,7 +117,28 @@ export default function GenerateContent({
     path: string;
   }>(null);
 
-  // Parse XML & resolve ALL names; render chips only when all are ready
+  // Base templates (debug)
+  const [baseTemplates, setBaseTemplates] = useState<
+    Array<{ name: string; fullName: string; templateId: string }>
+  >([]);
+
+  // getItemIdByPath result (debug)
+  const [pageBaseTemplateItem, setPageBaseTemplateItem] = useState<{
+    itemId: string;
+    name: string;
+    displayName?: string;
+    path: string;
+  } | null>(null);
+
+  // RAW template definition (debug)
+  const [pageTemplateDefinition, setPageTemplateDefinition] = useState<any>(null);
+
+  // FINAL: extracted field/type pairs from Page + _Seo Metadata (deduped by fieldName)
+  const [pageFieldTypePairs, setPageFieldTypePairs] = useState<
+    { fieldName: string; fieldType: string }[]
+  >([]);
+
+  // Parse XML & resolve ALL names for left renderings list
   useEffect(() => {
     setRenderings([]);
     setNameMap({});
@@ -158,7 +182,7 @@ export default function GenerateContent({
           const info = res.value;
           const xmlGuid = guids[i];
           map[normalizeGuid(info.itemId)] = info;
-          map[xmlGuid] = info; // index also by XML guid
+          map[xmlGuid] = info;
         }
       }
       setNameMap(map);
@@ -166,8 +190,103 @@ export default function GenerateContent({
     })();
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
-  // Click → load template fields from datasource template
-  const onClickRendering = async (componentIdRaw: string, compName:any) => {
+  // helper: extract [{fieldName, fieldType}] from raw template tree
+  function extractFieldTypePairs(raw: any): { fieldName: string; fieldType: string }[] {
+    const pairs: { fieldName: string; fieldType: string }[] = [];
+    try {
+      const sectionNodes = raw?.children?.nodes ?? [];
+      for (const section of sectionNodes) {
+        const fieldNodes = section?.children?.nodes ?? [];
+        for (const f of fieldNodes) {
+          const fieldName = f?.name ?? "";
+          const typeNode = f?.fields?.nodes?.find((n: any) => n?.name === "Type");
+          const fieldType = typeNode?.value ?? "";
+          if (fieldName && fieldType) {
+            pairs.push({ fieldName, fieldType });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[SCR3][GraphQL][TemplateDefinition][Extract][ERROR]", e);
+    }
+    return pairs;
+  }
+
+  // --- Chain calls: Base Templates -> Page -> _Seo Metadata -> merge & dedupe
+  useEffect(() => {
+    if (!client || !sitecoreContextId) return;
+
+    const BLOG_TEMPLATE_ID = "43C1BC5D-831F-47F8-9D03-D3BA6602A0FD";
+
+    (async () => {
+      try {
+        setPageFieldTypePairs([]);
+
+        const nodes = await getBaseTemplatesByTemplateId(
+          client!,
+          sitecoreContextId,
+          BLOG_TEMPLATE_ID
+        );
+        setBaseTemplates(nodes);
+
+        // 1) PAGE
+        const pageBase = nodes.find((n) => (n.name || "").toLowerCase() === "page");
+        if (pageBase) {
+          const pageItem = await getItemByPath(client!, sitecoreContextId, pageBase.templateId);
+          setPageBaseTemplateItem(pageItem);
+
+          if (pageItem?.path) {
+            const pageRaw = await getTemplateDefinitionByPath(
+              client!,
+              sitecoreContextId,
+              pageItem.path,
+              "en"
+            );
+            setPageTemplateDefinition(pageRaw);
+            const pagePairs = extractFieldTypePairs(pageRaw);
+            setPageFieldTypePairs(pagePairs);
+          }
+        } else {
+          console.log("[SCR3] Base template 'Page' not found.");
+        }
+
+        // 2) _SEO METADATA
+        const seoBase = nodes.find((n) => (n.name || "").toLowerCase() === "_seo metadata");
+        if (seoBase) {
+          const seoItem = await getItemByPath(client!, sitecoreContextId, seoBase.templateId);
+          if (seoItem?.path) {
+            const seoRaw = await getTemplateDefinitionByPath(
+              client!,
+              sitecoreContextId,
+              seoItem.path,
+              "en"
+            );
+            const seoPairs = extractFieldTypePairs(seoRaw);
+
+            // Merge & de-duplicate by fieldName
+            setPageFieldTypePairs((prev) => {
+              const all = [...prev, ...seoPairs];
+              const unique = all.reduce((acc, f) => {
+                if (!acc.some((x) => x.fieldName === f.fieldName)) acc.push(f);
+                return acc;
+              }, [] as { fieldName: string; fieldType: string }[]);
+              console.log("=== [SCR3][GraphQL][TemplateDefinition][Merged Page + _Seo Metadata][Unique] ===");
+              console.log(unique);
+              console.log("====================================================================");
+              return unique;
+            });
+          }
+        } else {
+          console.log("[SCR3] Base template '_Seo Metadata' not found.");
+        }
+      } catch (err: any) {
+        console.error("=== [SCR3][GraphQL][BaseTemplatesChain][ERROR] ===", err?.message || err);
+      }
+    })();
+  }, [client, sitecoreContextId]);
+
+  // Click → load template fields from datasource template (right panel)
+  const onClickRendering = async (componentIdRaw: string) => {
     if (!client || !sitecoreContextId) return;
     const componentId = normalizeGuid(componentIdRaw);
 
@@ -397,7 +516,7 @@ export default function GenerateContent({
       let value = "";
       switch (m.type) {
         case "Checkbox":
-          value = (raw ? "1" : "0") as string; // Sitecore accepts 1/0 for checkbox
+          value = (raw ? "1" : "0") as string;
           break;
         default:
           value = String(raw ?? "");
@@ -485,6 +604,34 @@ export default function GenerateContent({
         }
       />
 
+      {/* 2) Base Template Fields (right under the header card) */}
+      {pageFieldTypePairs.length > 0 && (
+        <Card
+          title="Base Template Fields"
+          subtitle="Auto-generated from Page and _Seo Metadata templates"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
+              const meta: TemplateFieldMeta = {
+                section: "BaseTemplate",
+                name: fieldName,
+                type: fieldType,
+              };
+              return (
+                <label key={`BaseTemplate/${fieldName}-${index}`} className="block">
+                  <div className="text-xs mb-1">
+                    <span className="font-semibold">{fieldName}</span>{" "}
+                    <span className="text-gray-500">({fieldType})</span>
+                  </div>
+                  {renderInput(meta)}
+                </label>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* 3) Renderings UI */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card title="Renderings" subtitle="Click a rendering to load its fields">
           {!namesReady ? (
