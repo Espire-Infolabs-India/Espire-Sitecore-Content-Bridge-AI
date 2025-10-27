@@ -3,6 +3,7 @@ import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import { GET_RENDERING_DATASOURCE_FIELDS } from "../gqlQueries/getRenderingDatasourceFiled";
 import { GET_RENDERING_INFO } from "../gqlQueries/getRenderingInfo";
 import { GET_ITEM_ID_BY_PATH } from "../gqlQueries/getItemIdByPath";
+import { WHICH_BASE_TEMPLATES_BY_ID } from "../gqlQueries/getBaseTemplatesByTemplateId";
 
 type MutateReturn<T> = {
   data?: { data?: T; errors?: Array<{ message?: string }> };
@@ -272,4 +273,125 @@ export async function createItemFromTemplate(
     throw new Error("CreateItem returned no item.");
   }
   return item;
+}
+
+/* ----------------------- Base Templates helper ----------------------- */
+
+type BaseTemplateNode = {
+  name: string;
+  fullName: string;
+  templateId: string;
+};
+
+function toDashedGuid(id: string): string {
+  if (!id) return id;
+  const s = id.replace(/[{}-]/g, "").toUpperCase();
+  if (s.length !== 32) return id;
+  return `${s.substring(0,8)}-${s.substring(8,12)}-${s.substring(12,16)}-${s.substring(16,20)}-${s.substring(20,32)}`;
+}
+
+type WhichBaseTemplatesByIdResult = {
+  itemTemplate: {
+    name: string;
+    fullName: string;
+    templateId: string;
+    baseTemplates: { edges: Array<{ node: BaseTemplateNode }> };
+  } | null;
+};
+
+export async function getBaseTemplatesByTemplateId(
+  client: ClientSDK,
+  sitecoreContextId: string,
+  templateIdRaw: string
+): Promise<BaseTemplateNode[]> {
+  let tid = (templateIdRaw || "").trim();
+  if (!tid) throw new Error("templateId is empty.");
+  const dashed = toDashedGuid(tid.replace(/[{}]/g, ""));
+  const templateId = dashed;
+
+  console.log(">> [SCR3][GraphQL][WhichBaseTemplatesById vars]:", { templateId });
+
+  const data = await callAuthoringGraphQL<WhichBaseTemplatesByIdResult>(
+    client,
+    sitecoreContextId,
+    WHICH_BASE_TEMPLATES_BY_ID,
+    { templateId }
+  );
+
+  const nodes = data?.itemTemplate?.baseTemplates?.edges?.map((e) => e.node) ?? [];
+
+  console.log("[SCR3][GraphQL][WhichBaseTemplatesById][ok]", {
+    templateId,
+    baseCount: nodes.length,
+  });
+
+  return nodes;
+}
+
+/* ----------------------- getItemIdByPath helper ---------------------- */
+
+export type BasicItemInfo = {
+  itemId: string;
+  name: string;
+  displayName?: string;
+  path: string;
+};
+
+export async function getItemByPath(
+  client: ClientSDK,
+  sitecoreContextId: string,
+  pathOrId: string
+): Promise<BasicItemInfo | null> {
+  type G = { item?: BasicItemInfo | null };
+  console.log("[SCR3][GQL][getItemByPath][vars]", { path: pathOrId });
+
+  const data = await callAuthoringGraphQL<G>(
+    client,
+    sitecoreContextId,
+    GET_ITEM_ID_BY_PATH,
+    { path: pathOrId }
+  );
+
+  return data?.item ?? null;
+}
+
+/* ------- RAW template definition by PATH (full children/fields tree) ------- */
+
+export type RawTemplateFieldNode = {
+  itemId: string;
+  name: string;
+  fields?: { nodes?: Array<{ name?: string; value?: string }> };
+};
+export type RawTemplateSectionNode = {
+  name?: string;
+  children?: { nodes?: RawTemplateFieldNode[] };
+};
+export type RawTemplateDefinition = {
+  item?: {
+    itemId?: string;
+    name?: string;
+    path?: string;
+    children?: { nodes?: RawTemplateSectionNode[] };
+  } | null;
+};
+
+export async function getTemplateDefinitionByPath(
+  client: ClientSDK,
+  sitecoreContextId: string,
+  path: string,
+  language = "en"
+): Promise<RawTemplateDefinition["item"]> {
+  const variables = { where: { path, language } };
+
+  console.log("[SCR3][GraphQL][TemplateDefinition][vars]", variables);
+
+  const data = await callAuthoringGraphQL<RawTemplateDefinition>(
+    client,
+    sitecoreContextId,
+    GET_RENDERING_DATASOURCE_FIELDS,
+    variables
+  );
+
+  console.log("[SCR3][GraphQL][TemplateDefinition][ok]", data?.item);
+  return data?.item ?? null;
 }
