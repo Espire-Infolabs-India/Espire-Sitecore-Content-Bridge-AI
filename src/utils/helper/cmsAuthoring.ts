@@ -3,7 +3,7 @@ import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import { GET_RENDERING_DATASOURCE_FIELDS } from "../gqlQueries/getRenderingDatasourceFiled";
 import { GET_RENDERING_INFO } from "../gqlQueries/getRenderingInfo";
 import { GET_ITEM_ID_BY_PATH } from "../gqlQueries/getItemIdByPath";
- 
+
 type MutateReturn<T> = {
   data?: { data?: T; errors?: Array<{ message?: string }> };
   errors?: Array<{ message?: string }>;
