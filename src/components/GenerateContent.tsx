@@ -367,13 +367,21 @@ export default function GenerateContent({
       case "Image":
       case "File":
         return (
-          <input
-            name={f.name}
-            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            placeholder={f.source ? `source: ${f.source}` : ""}
-            value={String(v ?? "")}
-            onChange={(e) => set(e.target.value)}
-          />
+          <>
+            <input
+             name={f.name}
+        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 "
+        placeholder={f.source ? `source: ${f.source}` : ""}
+        value={String(v ?? "")}
+        onChange={(e) => set(e.target.value)}
+      />
+
+      <GetMediaItems
+        appContext={appContext}
+        client={client}
+         onMediaSelect={(media) => {setFormValues((prev) => ({...prev,[f.name]: media.id, }));}}
+      />
+          </>
         );
       default:
         return (
