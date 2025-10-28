@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 
+
 import {
   getTemplateFields,
   resolveRendering,
@@ -84,11 +85,15 @@ export default function GenerateContent({
   client,
   selectedTemplateData,
   selectedFile,
+  prompt,
+  brandWebsite,
 }: {
   appContext: { resourceAccess?: Array<{ context?: { preview?: string } }> };
   client: ClientSDK | null;
   selectedTemplateData: ExtractedItem | null;
   selectedFile: any;
+  prompt: string | '';
+  brandWebsite: string | '';
 }) {
   const sitecoreContextId =
     appContext?.resourceAccess?.[0]?.context?.preview ?? "";
@@ -104,6 +109,8 @@ export default function GenerateContent({
   const [formValues, setFormValues] = useState<FormValues>({});
   const [dsTemplate, setDsTemplate] = useState<string>("");
   const [dsLocation, setDsLocation] = useState<string>("");
+
+
 
   // Hard-coded parent (as you wanted)
   const PARENT_ID = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
@@ -378,6 +385,8 @@ export default function GenerateContent({
       //setLoading(true);
       const formData = new FormData();
       formData.append("file", selectedFile);
+     
+      
 
       const uploadRes = await fetch("/api/generate-summary", {
         method: "POST",
@@ -391,7 +400,7 @@ export default function GenerateContent({
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blob_url, tFields }),
+        body: JSON.stringify({ blob_url, tFields, prompt: prompt, brandWebsite: brandWebsite }),
       });
 
       if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
@@ -456,7 +465,7 @@ export default function GenerateContent({
             name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={4}
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -467,7 +476,7 @@ export default function GenerateContent({
             name={f.name}
             type="number"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -477,7 +486,7 @@ export default function GenerateContent({
             name={f.name}
             type="date"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -487,7 +496,7 @@ export default function GenerateContent({
             name={f.name}
             type="datetime-local"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -498,7 +507,7 @@ export default function GenerateContent({
             type="url"
             placeholder="https://… or internal link"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -511,16 +520,25 @@ export default function GenerateContent({
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={2}
             placeholder="IDs/paths comma- or newline-separated"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
       case "Droplink":
       case "Droptree":
       case "Image":
+        return (
+          <input
+            name={f.name}
+            type="file"
+            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            onChange={(e) => set(e.target.value)}
+          />
+        );
       case "File":
         return (
           <input
+            type="file"
             name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             placeholder={f.source ? `source: ${f.source}` : ""}
@@ -831,6 +849,7 @@ export default function GenerateContent({
           )}
         </div>
       </div>
+      
     </div>
   );
 }

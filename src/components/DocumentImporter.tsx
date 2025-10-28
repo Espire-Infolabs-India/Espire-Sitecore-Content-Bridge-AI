@@ -3,6 +3,7 @@ import React, { useRef, useState } from "react";
 import styles from "./DocumentImporter.module.css";
 import GetPageTemplates from "./GetPageTemplates";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import Settings from "./Settings";
 
 type UploadedFile = {
   name: string;
@@ -26,6 +27,10 @@ export default function DocumentImporter({
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showPageTemplates, setShowPageTemplates] = useState(false);
+  const [promptValue, setPromptValue] = useState<string>("Rewrite in a more engaging style, but maintain all important details.");
+  const [brandWebsite, setBrandWebsite] = useState<string>("https://www.oki.com/global/profile/brand/");
+   
+  const [isModalOpen, setModalOpen] = useState(false);
 
   const readFileAsBase64 = (file: File): Promise<string | ArrayBuffer | null> =>
     new Promise((resolve, reject) => {
@@ -80,11 +85,20 @@ export default function DocumentImporter({
   };
 
   if (showPageTemplates) {
-    return <GetPageTemplates appContext={appContext} client={client} selectedFile={selectedFile} />;
+    return <GetPageTemplates appContext={appContext} client={client} selectedFile={selectedFile} prompt={promptValue} brandWebsite={brandWebsite} />;
   }
 
+  const getPromptValue = (e: React.SyntheticEvent) => {
+    setPromptValue((e.target as HTMLInputElement).value);
+  };
+
+  const getBrandWebsite = (e: React.SyntheticEvent) => {
+    setBrandWebsite((e.target as HTMLInputElement).value);
+  };
+  
   return (
     <div className={`${styles.container} max-w-5xl mx-auto p-6`}>
+      <Settings prompt={promptValue} brandWebsite={brandWebsite} setPromptValue={getPromptValue} setBrandWebsite={getBrandWebsite} />
       <h1>Screen 1</h1>
       <h3 className={`${styles.title} text-2xl font-semibold mb-4`}>
         Content Bridge AI
