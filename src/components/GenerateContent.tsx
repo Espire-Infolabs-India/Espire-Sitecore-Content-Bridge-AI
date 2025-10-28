@@ -97,8 +97,7 @@ export default function GenerateContent({
   const [nameMap, setNameMap] = useState<Record<string, RenderingInfo>>({});
   const [namesReady, setNamesReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorAlert, setErrorAlert] = useState('');
-  
+  const [errorAlert, setErrorAlert] = useState("");
 
   const [activeRenderingId, setActiveRenderingId] = useState<string>("");
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
@@ -131,7 +130,8 @@ export default function GenerateContent({
   } | null>(null);
 
   // RAW template definition (debug)
-  const [pageTemplateDefinition, setPageTemplateDefinition] = useState<any>(null);
+  const [pageTemplateDefinition, setPageTemplateDefinition] =
+    useState<any>(null);
 
   // FINAL: extracted field/type pairs from Page + _Seo Metadata (deduped by fieldName)
   const [pageFieldTypePairs, setPageFieldTypePairs] = useState<
@@ -191,7 +191,9 @@ export default function GenerateContent({
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
   // helper: extract [{fieldName, fieldType}] from raw template tree
-  function extractFieldTypePairs(raw: any): { fieldName: string; fieldType: string }[] {
+  function extractFieldTypePairs(
+    raw: any
+  ): { fieldName: string; fieldType: string }[] {
     const pairs: { fieldName: string; fieldType: string }[] = [];
     try {
       const sectionNodes = raw?.children?.nodes ?? [];
@@ -199,7 +201,9 @@ export default function GenerateContent({
         const fieldNodes = section?.children?.nodes ?? [];
         for (const f of fieldNodes) {
           const fieldName = f?.name ?? "";
-          const typeNode = f?.fields?.nodes?.find((n: any) => n?.name === "Type");
+          const typeNode = f?.fields?.nodes?.find(
+            (n: any) => n?.name === "Type"
+          );
           const fieldType = typeNode?.value ?? "";
           if (fieldName && fieldType) {
             pairs.push({ fieldName, fieldType });
@@ -230,9 +234,15 @@ export default function GenerateContent({
         setBaseTemplates(nodes);
 
         // 1) PAGE
-        const pageBase = nodes.find((n) => (n.name || "").toLowerCase() === "page");
+        const pageBase = nodes.find(
+          (n) => (n.name || "").toLowerCase() === "page"
+        );
         if (pageBase) {
-          const pageItem = await getItemByPath(client!, sitecoreContextId, pageBase.templateId);
+          const pageItem = await getItemByPath(
+            client!,
+            sitecoreContextId,
+            pageBase.templateId
+          );
           setPageBaseTemplateItem(pageItem);
 
           if (pageItem?.path) {
@@ -251,9 +261,15 @@ export default function GenerateContent({
         }
 
         // 2) _SEO METADATA
-        const seoBase = nodes.find((n) => (n.name || "").toLowerCase() === "_seo metadata");
+        const seoBase = nodes.find(
+          (n) => (n.name || "").toLowerCase() === "_seo metadata"
+        );
         if (seoBase) {
-          const seoItem = await getItemByPath(client!, sitecoreContextId, seoBase.templateId);
+          const seoItem = await getItemByPath(
+            client!,
+            sitecoreContextId,
+            seoBase.templateId
+          );
           if (seoItem?.path) {
             const seoRaw = await getTemplateDefinitionByPath(
               client!,
@@ -270,9 +286,13 @@ export default function GenerateContent({
                 if (!acc.some((x) => x.fieldName === f.fieldName)) acc.push(f);
                 return acc;
               }, [] as { fieldName: string; fieldType: string }[]);
-              console.log("=== [SCR3][GraphQL][TemplateDefinition][Merged Page + _Seo Metadata][Unique] ===");
+              console.log(
+                "=== [SCR3][GraphQL][TemplateDefinition][Merged Page + _Seo Metadata][Unique] ==="
+              );
               console.log(unique);
-              console.log("====================================================================");
+              console.log(
+                "===================================================================="
+              );
               return unique;
             });
           }
@@ -280,7 +300,10 @@ export default function GenerateContent({
           console.log("[SCR3] Base template '_Seo Metadata' not found.");
         }
       } catch (err: any) {
-        console.error("=== [SCR3][GraphQL][BaseTemplatesChain][ERROR] ===", err?.message || err);
+        console.error(
+          "=== [SCR3][GraphQL][BaseTemplatesChain][ERROR] ===",
+          err?.message || err
+        );
       }
     })();
   }, [client, sitecoreContextId]);
@@ -317,29 +340,40 @@ export default function GenerateContent({
 
     if (!templateClean) return;
 
-    const tFields = await getTemplateFields(client, sitecoreContextId, templateClean);
-    console.log('_______________________tFields',tFields);
+    const tFields = await getTemplateFields(
+      client,
+      sitecoreContextId,
+      templateClean
+    );
+    console.log("_______________________tFields", tFields);
     let contentSummary = await generateContentSummary(tFields);
     let currentTimeStamp = Date.now().toString().slice(-6);
-    let compNameUnique = compName?.toLowerCase()+'_'+currentTimeStamp;
+    let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
     setNewItemName(compNameUnique);
 
-    console.log('_______________________contentSummary after 0 ',contentSummary?.result);
-    let contentSummary1 = contentSummary?.result?.map((item: { name: any; reference: any; }) => {
-      item.name = item.reference;
-      return item;
-    });
-    console.log('_______________________contentSummary after ',contentSummary1);
+    console.log(
+      "_______________________contentSummary after 0 ",
+      contentSummary?.result
+    );
+    let contentSummary1 = contentSummary?.result?.map(
+      (item: { name: any; reference: any }) => {
+        item.name = item.reference;
+        return item;
+      }
+    );
+    console.log(
+      "_______________________contentSummary after ",
+      contentSummary1
+    );
 
     setFields(contentSummary1);
-    
 
     const init: FormValues = {};
     for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
     setFormValues(init);
   };
 
-  const generateContentSummary = async (tFields:any) => {
+  const generateContentSummary = async (tFields: any) => {
     try {
       //setLoading(true);
       const formData = new FormData();
@@ -352,7 +386,7 @@ export default function GenerateContent({
 
       if (!uploadRes.ok) throw new Error("File upload failed");
       const { blob_url } = await uploadRes.json();
-      
+
       // 2️⃣ Send to third-party API
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
@@ -365,7 +399,7 @@ export default function GenerateContent({
       const data = await thirdPartyRes.json();
       console.log("Third-party response:", data);
       console.log("Uploaded PDF link:", blob_url);
-      
+
       if (thirdPartyRes?.status == 200) {
         return data?.data;
       } else {
@@ -395,11 +429,11 @@ export default function GenerateContent({
   }, [fields]);
 
   const renderInput = (f: TemplateFieldMeta) => {
-    console.log('fields values',f);
+    console.log("fields values", f);
     const k = f.name;
     const v = formValues[k];
     const set = (nv: string | boolean) =>
-    setFormValues((s) => ({ ...s, [k]: nv }));
+      setFormValues((s) => ({ ...s, [k]: nv }));
 
     switch (f.type) {
       case "Checkbox":
@@ -508,7 +542,7 @@ export default function GenerateContent({
 
   /** Convert current form to simple [{name, value}] list for mutation */
   function toCreateFields(values: FormValues, metas: TemplateFieldMeta[]) {
-    console.log('__________toCreateFields______',values, metas);
+    console.log("__________toCreateFields______", values, metas);
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
       const raw = values[m.name];
@@ -552,15 +586,14 @@ export default function GenerateContent({
       );
 
       // Build fields payload from form
-      console.log('______________formValues',formValues);
-      console.log('______________fields',fields);
+      console.log("______________formValues", formValues);
+      console.log("______________fields", fields);
 
       type InputData = {
         name: string;
         value: string;
       };
 
-     
       // const inputs = document.querySelectorAll<HTMLInputElement>('.dynamic-input');
       // const data: InputData[] = Array.from(inputs).map((input) => ({
       //   name: input.name || '',        // fallback if name not set
@@ -568,15 +601,23 @@ export default function GenerateContent({
       // }));
       // console.log('______________getDynamicInputValues',data);
 
-
       const fieldsPayload = toCreateFields(formValues, fields);
 
-      console.log('______________fieldsPayload',fieldsPayload);
+      console.log("______________fieldsPayload", fieldsPayload);
 
       // Create the item (fields are inlined inside the mutation)
+      let parentId = PARENT_ID;
+      if (selectedInfo?.name?.toLowerCase().includes("carousel")) {
+        parentId = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
+      } else if (selectedInfo?.name?.toLowerCase().includes("promo")) {
+        parentId = "{8E44568A-E881-4CD9-A44F-399049DCF198}";
+      } else if (selectedInfo?.name?.toLowerCase().includes("image")) {
+        parentId = "{E812C7E5-8C9C-4848-A36A-B1FFB5B94387}";
+      }
+
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
-        parentId: PARENT_ID,
+        parentId,
         templateId,
         fields: fieldsPayload,
       });
@@ -617,10 +658,13 @@ export default function GenerateContent({
                 section: "BaseTemplate",
                 name: fieldName,
                 type: fieldType,
-                value: undefined
+                value: undefined,
               };
               return (
-                <label key={`BaseTemplate/${fieldName}-${index}`} className="block">
+                <label
+                  key={`BaseTemplate/${fieldName}-${index}`}
+                  className="block"
+                >
                   <div className="text-xs mb-1">
                     <span className="font-semibold">{fieldName}</span>{" "}
                     <span className="text-gray-500">({fieldType})</span>
@@ -635,7 +679,10 @@ export default function GenerateContent({
 
       {/* 3) Renderings UI */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="Renderings" subtitle="Click a rendering to load its fields">
+        <Card
+          title="Renderings"
+          subtitle="Click a rendering to load its fields"
+        >
           {!namesReady ? (
             <div className="space-y-2">
               <div className="h-7 w-28 rounded-full bg-gray-200 animate-pulse" />
@@ -677,7 +724,7 @@ export default function GenerateContent({
                         label={info.name}
                         title={tooltip}
                         active={activeRenderingId === guid}
-                        onClick={() => onClickRendering(guid,info.name)}
+                        onClick={() => onClickRendering(guid, info.name)}
                       />
                     </li>
                   );
