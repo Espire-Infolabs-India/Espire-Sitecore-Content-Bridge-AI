@@ -431,7 +431,7 @@ export default function GenerateContent({
             name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={4}
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -442,7 +442,7 @@ export default function GenerateContent({
             name={f.name}
             type="number"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -452,7 +452,7 @@ export default function GenerateContent({
             name={f.name}
             type="date"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -462,7 +462,7 @@ export default function GenerateContent({
             name={f.name}
             type="datetime-local"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -473,7 +473,7 @@ export default function GenerateContent({
             type="url"
             placeholder="https://… or internal link"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -486,16 +486,25 @@ export default function GenerateContent({
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={2}
             placeholder="IDs/paths comma- or newline-separated"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
       case "Droplink":
       case "Droptree":
       case "Image":
+        return (
+          <input
+            name={f.name}
+            type="file"
+            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            onChange={(e) => set(e.target.value)}
+          />
+        );
       case "File":
         return (
           <input
+            type="file"
             name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             placeholder={f.source ? `source: ${f.source}` : ""}
