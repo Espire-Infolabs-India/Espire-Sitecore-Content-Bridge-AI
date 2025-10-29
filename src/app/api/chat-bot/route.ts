@@ -100,6 +100,10 @@ export async function POST(req: Request) {
       },
     });
 
+    console.log('____________payload in server',payload);
+
+    console.log('____________response in server',response?.data);
+
       if(response?.data?.result && response?.data?.result?.length > 0){
         let apiresponse = response?.data?.result;
         let finalResponse =  tFields?.map((item: any) => {
