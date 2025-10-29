@@ -23,6 +23,7 @@ import {
   parseRenderingsFromXml,
   RenderingFromXml,
 } from "../utils/lib/parseRenderingsFromXml";
+import { PutBlobResult } from "@vercel/blob";
 
 interface ExtractedItem {
   name: string;
@@ -408,32 +409,29 @@ export default function GenerateContent({
 
   const generateContentSummary = async (tFields: any) => {
     try {
-      //setLoading(true);
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-     
-      
-
-      const uploadRes = await fetch("/api/generate-summary", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadRes.ok) throw new Error("File upload failed");
-      const { blob_url } = await uploadRes.json();
+      setLoading(true);
+      const file = selectedFile;
+      const response = await fetch(
+        `/api/upload?filename=${file.name}`,
+        {
+          method: 'POST',
+          body: file,
+        },
+      );
+      const blob_url = (await response.json()) as PutBlobResult;
+      const uploadedFileName = blob_url.url;
+      console.log('............uploadedFileName',uploadedFileName);
 
       // 2️⃣ Send to third-party API
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blob_url, tFields, prompt: prompt, brandWebsite: brandWebsite }),
+        body: JSON.stringify({ uploadedFileName, tFields, prompt, brandWebsite }),
       });
 
       if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
 
       const data = await thirdPartyRes.json();
-      console.log("Third-party response:", data);
-      console.log("Uploaded PDF link:", blob_url);
 
       if (thirdPartyRes?.status == 200) {
         return data?.data;

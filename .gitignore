@@ -43,3 +43,6 @@ next-env.d.ts
 # IDEs
 .vscode
 /.vs
+
+package-lock.json
+.env.local.env
