@@ -1,9 +1,11 @@
 "use client";
 import React, { useRef, useState } from "react";
+import Image from 'next/image';
 import styles from "./DocumentImporter.module.css";
 import GetPageTemplates from "./GetPageTemplates";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import Settings from "./Settings";
+import upload from "../images/upload.png";
 
 type UploadedFile = {
   name: string;
@@ -29,7 +31,7 @@ export default function DocumentImporter({
   const [showPageTemplates, setShowPageTemplates] = useState(false);
   const [promptValue, setPromptValue] = useState<string>("Rewrite in a more engaging style, but maintain all important details.");
   const [brandWebsite, setBrandWebsite] = useState<string>("https://www.oki.com/global/profile/brand/");
-   
+
   const [isModalOpen, setModalOpen] = useState(false);
 
   const readFileAsBase64 = (file: File): Promise<string | ArrayBuffer | null> =>
@@ -95,19 +97,19 @@ export default function DocumentImporter({
   const getBrandWebsite = (e: React.SyntheticEvent) => {
     setBrandWebsite((e.target as HTMLInputElement).value);
   };
-  
+
   return (
     <div className={`${styles.container} max-w-5xl mx-auto p-6`}>
       <Settings prompt={promptValue} brandWebsite={brandWebsite} setPromptValue={getPromptValue} setBrandWebsite={getBrandWebsite} />
       <h1>Screen 1</h1>
-      <h3 className={`${styles.title} text-2xl font-semibold mb-4`}>
+      <h3 className={`${styles.title} text-2xl font-semibold mb-4 text-center`}>
         Content Bridge AI
       </h3>
       <div
-        className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden`}
+        className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden document_importer_wrapper `}
       >
         <div
-          className={`${styles.cardInner} md:flex md:items-start md:gap-6 p-6`}
+          className={`${styles.cardInner} md:flex md:items-start md:gap-6 p-6 document_importer_inner`}
         >
           {/* Drag & Drop Area */}
           <div
@@ -119,20 +121,24 @@ export default function DocumentImporter({
               role="button"
               tabIndex={0}
               onClick={onChooseClick}
-              className={`${
-                styles.dropArea
-              } relative border rounded-md h-48 flex flex-col items-center justify-center p-6 cursor-pointer transition-colors 
+              className={`${styles.dropArea
+                } document_importer_button relative rounded-md h-48 flex flex-col items-center justify-center p-6 cursor-pointer transition-colors 
                 ${loading ? "opacity-70" : "hover:bg-gray-50"}`}
             >
-              <div className={styles.dropNote}>Drag & drop or</div>
+              <Image src={upload}
+                alt="upload image"
+                width={30}
+                height={30}
+              />
+              <div className={`${styles.dropNote} document_importer_note`}>Drag & drop or</div>
               <div
-                className={`${styles.previewText} mt-2 text-sm text-gray-700`}
+                className={`${styles.previewText} mt-2 text-sm text-gray-700 document_importer_text`}
               >
-                <strong className="text-indigo-600">Choose File</strong> to
+                <strong className="text-indigo-600 document_importer_choosefile">Choose File</strong> to
                 upload
               </div>
               <div
-                className={`${styles.supportText} mt-1 text-xs text-gray-400`}
+                className={`${styles.supportText} italic mt-1 text-xs text-gray-400 document_importer_text`}
               >
                 Supported formats: PDF, DOCX, DOC, TXT
               </div>
@@ -154,9 +160,9 @@ export default function DocumentImporter({
             </div>
 
             {/* Selected File details */}
-            <div className="mt-4 px-2">
+            <div className="mt-4 px-2 flex justify-between items-center">
               {file ? (
-                <div className={styles.fileBox}>
+                <div className={`${styles.fileBox}text-sm document_importer_filename`}>
                   <div>
                     <div className={styles.fileName}>{file.name}</div>
                     <div className={styles.fileSize}>
@@ -166,43 +172,41 @@ export default function DocumentImporter({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={reset}
-                      className={`${styles.btn} ${styles.cancelBtn}`}
+                      className={`${styles.btn} ${styles.cancelBtn} document_importer_removebutton`}
                     >
                       Remove
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="text-sm text-gray-500">No file selected</div>
+                <div className="text-base text-gray-500">No file selected</div>
               )}
+              {/* Footer Buttons */}
+              <div className={`${styles.footer} document_importer_footer`}>
+                <button
+                  onClick={reset}
+                  className={`${styles.btn} ${styles.cancelBtn}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImport}
+                  disabled={!file || loading || importing}
+                  className={`${styles.importBtn} ${!file || loading || importing ? styles.disabled : ""
+                    } document_importer`}
+                >
+                  {importing ? (
+                    <>
+                      <span className={styles.spinner} />
+                      Importing…
+                    </>
+                  ) : (
+                    "Import"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Footer Buttons */}
-        <div className={styles.footer}>
-          <button
-            onClick={reset}
-            className={`${styles.btn} ${styles.cancelBtn}`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleImport}
-            disabled={!file || loading || importing}
-            className={`${styles.importBtn} ${
-              !file || loading || importing ? styles.disabled : ""
-            }`}
-          >
-            {importing ? (
-              <>
-                <span className={styles.spinner} />
-                Importing…
-              </>
-            ) : (
-              "Import"
-            )}
-          </button>
         </div>
       </div>
     </div>
