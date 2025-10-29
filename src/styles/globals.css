@@ -132,3 +132,57 @@ pre {
 .primary-button:hover {
   background-color: #0056b3;
 }
+
+
+/* screen 1 */
+.document_importer_wrapper{
+  border: none;
+}
+.document_importer_inner{
+  border: 3px dashed #ccc;
+}
+.document_importer_button, .document_importer_button:hover{
+  background-color: transparent;
+  border: none;
+}
+.document_importer_note{
+  position: inherit;
+  left: inherit;
+  top: inherit;
+  font-size: 16px;
+  margin-top:.5rem;
+}
+.document_importer_text{
+ font-size: 16px;
+  margin-bottom:.5rem;
+  color:#6b7280;
+}
+.document_importer_choosefile{
+ font-size: 16px;
+ margin-bottom:.5rem;
+}
+
+.document_importer_filename{
+  border:none;
+  background-color: transparent;
+}
+.document_importer_removebutton{
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  border-bottom: 2px solid #eb001a;
+  color: #eb001a;
+  padding: 5px 0;
+}
+.document_importer_footer{
+  border:none;
+}
+.document_importer{
+  background: #eb001a;
+    border: 1px solid #eb001a;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+}
