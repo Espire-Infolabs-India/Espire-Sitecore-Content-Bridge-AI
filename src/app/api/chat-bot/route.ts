@@ -6,64 +6,64 @@ export async function POST(req: Request) {
     const { blob_url, tFields, prompt, brandWebsite } = await req.json();
     let filteredTFields = tFields?.filter((item:any) => item.type == 'Single-Line Text' || item.type == 'Rich Text');
 
-    interface ResultItem {
-      name: string;
-      display_name: string;
-      reference: string;
-      type: string;
-      section: string;
-      value: string;
-    }
+    // interface ResultItem {
+    //   name: string;
+    //   display_name: string;
+    //   reference: string;
+    //   type: string;
+    //   section: string;
+    //   value: string;
+    // }
 
-    interface ResponseType {
-      data: {
-        result: ResultItem[];
-      };
-    }
+    // interface ResponseType {
+    //   data: {
+    //     result: ResultItem[];
+    //   };
+    // }
 
-    var response1: ResponseType = {
-      data: {
-        result: [
-                  {
-                      "section": "Promo",
-                      "name": "PromoText",
-                      "display_name": "PromoText",
-                      "reference": "Promo_PromoText",
-                      "type": "Rich Text",
-                      "value": "api test value"
-                  },
-                  {
-                      "section": "Promo",
-                      "name": "PromoLink",
-                      "type": "General Link",
-                      "display_name": "PromoText",
-                      "reference": "Promo_PromoLink",
-                      "value": "api link test value"
-                  },
-                  {
-                      "section": "Promo",
-                      "name": "PromoText2",
-                      "type": "Rich Text",
-                      "display_name": "PromoText",
-                      "reference": "Promo_PromoText2",
-                      "value": "api test value"
-                  }
-              ]
-      }
-    };
+    // var response1: ResponseType = {
+    //   data: {
+    //     result: [
+    //               {
+    //                   "section": "Promo",
+    //                   "name": "PromoText",
+    //                   "display_name": "PromoText",
+    //                   "reference": "Promo_PromoText",
+    //                   "type": "Rich Text",
+    //                   "value": "api test value"
+    //               },
+    //               {
+    //                   "section": "Promo",
+    //                   "name": "PromoLink",
+    //                   "type": "General Link",
+    //                   "display_name": "PromoText",
+    //                   "reference": "Promo_PromoLink",
+    //                   "value": "api link test value"
+    //               },
+    //               {
+    //                   "section": "Promo",
+    //                   "name": "PromoText2",
+    //                   "type": "Rich Text",
+    //                   "display_name": "PromoText",
+    //                   "reference": "Promo_PromoText2",
+    //                   "value": "api test value"
+    //               }
+    //           ]
+    //   }
+    // };
     
-    let apiresponse = response1?.data?.result;
-    let finalResponse =  tFields?.map((item: any) => {
-      let match = apiresponse.find((obj: any) => obj?.reference?.toLowerCase() == item?.section?.toLowerCase()+'_'+item?.name?.toLowerCase());
-      if(match){
-        return {...item, ...match};
-      }else{
-        item.value = "";
-        return item;
-      }
-    });
-    console.log('final.............',finalResponse);
-    return NextResponse.json({ success: true, data: {result: finalResponse} });
+    // let apiresponse = response1?.data?.result;
+    // let finalResponse =  tFields?.map((item: any) => {
+    //   let match = apiresponse.find((obj: any) => obj?.reference?.toLowerCase() == item?.section?.toLowerCase()+'_'+item?.name?.toLowerCase());
+    //   if(match){
+    //     return {...item, ...match};
+    //   }else{
+    //     item.value = "";
+    //     return item;
+    //   }
+    // });
+    // console.log('final.............',finalResponse);
+    // return NextResponse.json({ success: true, data: {result: finalResponse} });
 
     const newtFields = filteredTFields
     .filter((item: { reference: any; }) => !item.reference) // only include items WITHOUT 'reference'
