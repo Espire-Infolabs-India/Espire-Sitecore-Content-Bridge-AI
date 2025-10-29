@@ -107,13 +107,14 @@ export default function GenerateContent({
 
   const [activeRenderingId, setActiveRenderingId] = useState<string>("");
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
-  const [formValues, setFormValues] = useState<FormValues>({});
+  const [formValues, setFormValues] = useState<FormValues>({}); // Rendering form values
   const [dsTemplate, setDsTemplate] = useState<string>("");
   const [dsLocation, setDsLocation] = useState<string>("");
 
+  // ✅ NEW: Base template fields के अलग values
+  const [baseFormValues, setBaseFormValues] = useState<FormValues>({}); // Base Page + _SEO values
 
-
-  // Hard-coded parent (as you wanted)
+  // Hard-coded parent (as you wanted) — (datasource creation)
   const PARENT_ID = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
   const [newItemName, setNewItemName] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -146,8 +147,32 @@ export default function GenerateContent({
     { fieldName: string; fieldType: string }[]
   >([]);
 
-  // Parse XML & resolve ALL names for left renderings list
-  useEffect(() => {
+  // ===================== Blog Page creation constants & state =====================
+  const BLOG_PARENT_ID = "{CFA8F31E-2335-47DF-8041-B8B8261D6A6A}";
+  const BLOG_TEMPLATE_ID = "43C1BC5D-831F-47F8-9D03-D3BA6602A0FD";
+
+  const [newPageName, setNewPageName] = useState<string>("");
+  const [creatingPage, setCreatingPage] = useState(false);
+  const [pageError, setPageError] = useState<string>("");
+  const [pageCreated, setPageCreated] = useState<null | {
+    itemId: string;
+    name: string;
+    path: string;
+  }>(null);
+
+  function pairsToMetas(
+    pairs: { fieldName: string; fieldType: string }[]
+  ): TemplateFieldMeta[] {
+    return pairs.map((p) => ({
+      section: "BaseTemplate",
+      name: p.fieldName,
+      type: p.fieldType,
+    }));
+  }
+
+  // ===================== original logic (renderings resolve) =====================
+    // Parse XML & resolve ALL names for left renderings list
+    useEffect(() => {
     setRenderings([]);
     setNameMap({});
     setActiveRenderingId("");
@@ -622,26 +647,42 @@ export default function GenerateContent({
         sitecoreContextId,
         dsTemplate
       );
-
-      // Build fields payload from form
-      console.log("______________formValues", formValues);
-      console.log("______________fields", fields);
-
-      type InputData = {
-        name: string;
-        value: string;
-      };
-
-      // const inputs = document.querySelectorAll<HTMLInputElement>('.dynamic-input');
-      // const data: InputData[] = Array.from(inputs).map((input) => ({
-      //   name: input.name || '',        // fallback if name not set
-      //   value: input.value.trim(),
-      // }));
-      // console.log('______________getDynamicInputValues',data);
-
       const fieldsPayload = toCreateFields(formValues, fields);
 
-      console.log("______________fieldsPayload", fieldsPayload);
+      const item = await createItemFromTemplate(client, sitecoreContextId, {
+        name: newItemName.trim(),
+        parentId: PARENT_ID,
+        templateId,
+        fields: fieldsPayload,
+      });
+
+      setCreated({ itemId: item.itemId, name: item.name, path: item.path });
+    } catch (e: any) {
+      setSaveError(e?.message || "Failed to create datasource item.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // === Create Blog Page (uses BASE form values only)
+  const onCreateBlogPage = async () => {
+    setPageError("");
+    setPageCreated(null);
+
+    if (!client || !sitecoreContextId) {
+      setPageError("Client/context unavailable.");
+      return;
+    }
+    if (!newPageName.trim()) {
+      setPageError("Please enter a page name.");
+      return;
+    }
+
+    try {
+      setCreatingPage(true);
+
+      const pageMetas = pairsToMetas(pageFieldTypePairs);
+      const fieldsPayload = toCreateFields(baseFormValues, pageMetas);
 
       // Create the item (fields are inlined inside the mutation)
       let parentId = PARENT_ID;
@@ -869,7 +910,45 @@ export default function GenerateContent({
           )}
         </div>
       </div>
-      
+
+      {/* === BOTTOM: Create Blog Page === */}
+      <Card
+        title="Create Blog Page"
+        subtitle="Create a new blog page under ‘All Blogs’"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1">Page Name</label>
+            <input
+              className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              value={newPageName}
+              onChange={(e) => setNewPageName(e.target.value)}
+              placeholder="e.g., Blog4"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Parent: All Blogs ({BLOG_PARENT_ID}) • Template: Blog ({BLOG_TEMPLATE_ID})
+            </div>
+          </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={onCreateBlogPage}
+              disabled={creatingPage}
+              className="px-4 py-2 rounded-lg border bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-60"
+            >
+              {creatingPage ? "Creating…" : "Create Page"}
+            </button>
+          </div>
+        </div>
+
+        {pageError && <div className="text-sm text-red-600 mt-2">{pageError}</div>}
+        {pageCreated && (
+          <div className="text-sm text-green-700 mt-2">
+            Created: <strong>{pageCreated.name}</strong> (
+            <code>{pageCreated.itemId}</code>) — {pageCreated.path}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
