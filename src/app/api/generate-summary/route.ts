@@ -6,6 +6,7 @@ import { Readable } from "stream";
 import { IncomingMessage } from "http"; // 👈 important
 
 export const config = { api: { bodyParser: false } };
+const isVercel = process.env.VERCEL === "1";
 
 // Ensure upload dir exists
 const ensureUploadDir = (dir: string) => {
@@ -33,7 +34,8 @@ async function toNodeRequest(req: Request): Promise<IncomingMessage> {
 
 export async function POST(req: Request) {
   try {
-    const uploadDir = path.join(process.cwd(), "public/uploads");
+    const uploadDir = isVercel ? "/tmp" : path.join(process.cwd(), "public/uploads");
+
     ensureUploadDir(uploadDir);
 
     const form = formidable({
@@ -63,8 +65,8 @@ export async function POST(req: Request) {
     const proto = req.headers.get("x-forwarded-proto") || "http";
     const host = req.headers.get("host") || "localhost:3000";
     const BASE_URL = `${proto}://${host}`;
-    const publicUrl = `${BASE_URL}/uploads/${fileName}`;
-
+    
+    const publicUrl = isVercel ? `${BASE_URL}/tmp/${fileName}` : `${BASE_URL}/public/uploads/${fileName}`;
     return NextResponse.json({
       success: true,
       blob_url: publicUrl,
