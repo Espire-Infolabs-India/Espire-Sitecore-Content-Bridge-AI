@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import GetMediaItems from "./GetMediaItems";
 
 
 import {
@@ -528,23 +529,34 @@ export default function GenerateContent({
       case "Droptree":
       case "Image":
         return (
+           <>
           <input
             name={f.name}
             type="file"
+            style={{ display: "none" }}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             onChange={(e) => set(e.target.value)}
           />
+          <GetMediaItems
+        appContext={appContext}
+        client={client}
+         onMediaSelect={(media) => {setFormValues((prev) => ({...prev,[f.name]: media.id, }));}}
+      />
+          </>
         );
       case "File":
         return (
-          <input
-            type="file"
-            name={f.name}
-            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            placeholder={f.source ? `source: ${f.source}` : ""}
-            value={String(v ?? "")}
-            onChange={(e) => set(e.target.value)}
-          />
+          <>
+            <input
+             name={f.name}
+        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 "
+        placeholder={f.source ? `source: ${f.source}` : ""}
+        value={String(v ?? "")}
+        onChange={(e) => set(e.target.value)}
+      />
+
+      
+          </>
         );
       default:
         return (
@@ -563,6 +575,8 @@ export default function GenerateContent({
     console.log("__________toCreateFields______", values, metas);
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
+
+
       const raw = values[m.name];
       if (raw === undefined) continue;
 
@@ -570,6 +584,12 @@ export default function GenerateContent({
       switch (m.type) {
         case "Checkbox":
           value = (raw ? "1" : "0") as string;
+          break;
+        case "Image":        
+          value = `<image mediaid="${raw}" />`;
+          break;
+        case "General Link":        
+          value = `<link linktype="external" url="${raw}" anchor="" target="" />`;
           break;
         default:
           value = String(raw ?? "");
@@ -579,7 +599,7 @@ export default function GenerateContent({
     return list;
   }
 
-  const onSaveDatasource = async () => {
+  const onSaveDatasource = async () => {    
     setSaveError("");
     setCreated(null);
 
