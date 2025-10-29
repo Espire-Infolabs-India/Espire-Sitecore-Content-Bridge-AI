@@ -162,7 +162,7 @@ export default function GenerateContent({
 
   function pairsToMetas(
     pairs: { fieldName: string; fieldType: string }[]
-  ): TemplateFieldMeta[] {
+  ): any {
     return pairs.map((p) => ({
       section: "BaseTemplate",
       name: p.fieldName,
@@ -652,7 +652,7 @@ export default function GenerateContent({
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
         parentId: PARENT_ID,
-        templateId,
+        templateId:templateId,
         fields: fieldsPayload,
       });
 
@@ -696,8 +696,8 @@ export default function GenerateContent({
 
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
-        parentId,
-        templateId,
+        parentId:parentId,
+        templateId:dsTemplate,
         fields: fieldsPayload,
       });
 
