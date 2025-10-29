@@ -3,7 +3,7 @@ import axios from "axios";
 
 export async function POST(req: Request) {
   try {
-    const { blob_url, tFields, prompt, brandWebsite } = await req.json();
+    const { uploadedFileName, tFields, prompt, brandWebsite } = await req.json();
     let filteredTFields = tFields?.filter((item:any) => item.type == 'Single-Line Text' || item.type == 'Rich Text');
 
     // interface ResultItem {
@@ -83,14 +83,16 @@ export async function POST(req: Request) {
     }));
 
 
-    console.log('____________newtFields in server',newtFields);
+    //console.log('____________newtFields in server',newtFields);
 
     const payload = {
-      blob_url,
+      blob_url:uploadedFileName,
       user_prompt: prompt || "Rewrite in a more engaging style, but maintain all important details.",
       brand_website_url: brandWebsite || "https://www.oki.com/global/profile/brand/",
       content_type: JSON.stringify(newtFields, null, 2),
     };
+
+    console.log('____________payload in server',payload);
 
     const response = await axios.post(process.env.CHATBOT_CUSTOM_API_END_POINT || "", payload, {
       headers: {
@@ -100,7 +102,7 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log('____________payload in server',payload);
+    
 
     console.log('____________response in server',response?.data);
 
