@@ -49,16 +49,16 @@ export default function DocumentImporter({
     try {
       setSelectedFile(f);
 
-      // const fileDetails = f;
-      // const response = await fetch(
-      //   `/api/upload?filename=${fileDetails?.name}`,
-      //   {
-      //     method: 'POST',
-      //     body: fileDetails,
-      //   },
-      // );
-      // const blob_url = (await response.json()) as PutBlobResult;
-      // setUploadedFileName(blob_url.url);
+      const fileDetails = f;
+      const response = await fetch(
+        `/api/upload?filename=${fileDetails?.name}`,
+        {
+          method: 'POST',
+          body: fileDetails,
+        },
+      );
+      const blob_url = (await response.json()) as PutBlobResult;
+      setUploadedFileName(blob_url.url);
       
       const dataUrl = await readFileAsBase64(f);
       const base64 = String(dataUrl).split(",")[1] || "";
