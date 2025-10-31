@@ -353,9 +353,9 @@ export default function GenerateContent({
       
             const data = await thirdPartyRes.json();
             let TempFinalResponse = data?.data?.result;
+            // uncommented this code later for set page name
             let pageNameResponse = TempFinalResponse?.filter((item: any) => item.name == 'pageName');
-            console.log('----------pageNameResponse',pageNameResponse,'-----',pageNameResponse[0].value);
-            setNewPageName(pageNameResponse[0].value);
+            setNewPageName(pageNameResponse[0]?.value);
             
             let finalResponse = uniquePairs.reduce((acc: any[], item: any) => {
               const match = TempFinalResponse.find((obj: any) =>
@@ -372,7 +372,18 @@ export default function GenerateContent({
 
             console.log("______________335_________finalResponse", finalResponse);
             setPageFieldTypePairs(finalResponse);
-            
+            // initialize base form values so BaseTemplate inputs show and control values
+            const initialBaseValues: Record<string, string | boolean> = finalResponse.reduce(
+              (acc: Record<string, string | boolean>, it: any) => {
+                if (it?.fieldName) acc[it.fieldName] = String(it.value ?? "");
+                return acc;
+              },
+              {}
+            );
+            // if (pageNameResponse?.[0]?.value) {
+            //   initialBaseValues["pageName"] = String(pageNameResponse[0].value);
+            // }
+            setBaseFormValues(initialBaseValues);
             setIsBaseFormLoader(false);
           }
         } else {
@@ -424,31 +435,32 @@ export default function GenerateContent({
       sitecoreContextId,
       templateClean
     );
-    console.log("_______________________tFields", tFields);
+    //console.log("_______________________tFields", tFields);
     let contentSummary = await generateContentSummary(tFields);
     let currentTimeStamp = Date.now().toString().slice(-6);
     let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
     setNewItemName(compNameUnique);
 
-    console.log(
-      "_______________________contentSummary after 0 ",
-      contentSummary?.result
-    );
+    console.log("_______________________contentSummary after 0 ",contentSummary?.result);
     let contentSummary1 = contentSummary?.result?.map(
       (item: { name: any; reference: any }) => {
         item.name = item.name;
         return item;
       }
     );
-    console.log(
-      "_______________________contentSummary after ",
-      contentSummary1
-    );
+    console.log("_______________________contentSummary after ",contentSummary1);
 
     setFields(contentSummary1);
 
+    // Initialize form values from AI-enriched field list so values render
     const init: FormValues = {};
-    for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
+    for (const f of contentSummary1 ?? []) {
+      if (f.type === "Checkbox") {
+        init[f.name] = Boolean(f.value);
+      } else {
+        init[f.name] = String(f.value ?? "");
+      }
+    }
     setFormValues(init);
   };
 
@@ -496,11 +508,15 @@ export default function GenerateContent({
 
   const renderInput = (f: TemplateFieldMeta) => {
     const k = f.name;
-    const v = formValues[k];
-    const set = (nv: string | boolean) =>
-      setFormValues((s) => ({ ...s, [k]: nv }));
-    console.log("f..........", f);
-
+    const isBase = f.section === "BaseTemplate";
+    const v = isBase ? baseFormValues[k] : formValues[k];
+    const set = (nv: string | boolean) => {
+      if (isBase) {
+        setBaseFormValues((s) => ({ ...s, [k]: nv }));
+      } else {
+        setFormValues((s) => ({ ...s, [k]: nv }));
+      }
+    };
     switch (f.type) {
       case "Checkbox":
         return (
@@ -522,7 +538,8 @@ export default function GenerateContent({
             name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={4}
-            value={f.value || ""}
+            value={String((v ?? f.value) ?? "")}
+            data-text="On it....  "
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -533,7 +550,7 @@ export default function GenerateContent({
             name={f.name}
             type="number"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={f.value || ""}
+            value={String((v ?? f.value) ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -543,7 +560,7 @@ export default function GenerateContent({
             name={f.name}
             type="date"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={f.value || ""}
+            value={String((v ?? f.value) ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -553,7 +570,7 @@ export default function GenerateContent({
             name={f.name}
             type="datetime-local"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={f.value || ""}
+            value={String((v ?? f.value) ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -564,7 +581,7 @@ export default function GenerateContent({
             type="url"
             placeholder="https://… or internal link"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={f.value || ""}
+            value={String((v ?? f.value) ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -577,7 +594,7 @@ export default function GenerateContent({
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={2}
             placeholder="IDs/paths comma- or newline-separated"
-            value={f.value || ""}
+            value={String((v ?? f.value) ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -619,7 +636,7 @@ export default function GenerateContent({
           <input
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dynamic-input"
             name={f.name}
-            value={f.value}
+            value={String(v ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );

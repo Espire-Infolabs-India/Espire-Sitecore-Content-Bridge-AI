@@ -59,7 +59,38 @@ export async function POST(req: Request) {
     //             ]
     //   }
     // };
-    
+
+    // var response1: ResponseType = {
+    //       data: {
+    //               "result": [
+    //                 {
+    //                   "section": "Promo",
+    //                   "name": "PromoText",
+    //                   "type": "Rich Text",
+    //                   "value": "Espire's enterprise solutions are engineered to streamline, modernize, and scale business operations. This includes advanced ERP, CRM, SCM, and HCM systems, all focused on elevating digital experiences, promoting ongoing innovation, and speeding up ROI. By integrating business processes across departments, we enhance data flow, boost operational efficiency, and support better decision-making. Espire leverages extensive domain expertise, certified specialists, and proven integration methods to help businesses reinvent their core operations with scalability, seamless integration, customization, and automation.",
+    //                   "display_name": "PromoText",
+    //                   "reference": "Promo_PromoText"
+    //               },
+    //               {
+    //                   "section": "Promo",
+    //                   "name": "PromoText2",
+    //                   "type": "Rich Text",
+    //                   "value": "Espire's expertise covers key areas like ERP, offering cloud-first, AI-ready systems that unify finance, supply chain, HR, projects, and customer operations for data-driven decisions and growth. In CRM, our solutions manage customer interactions to improve service, drive sales, and enhance retention. SCM systems optimize the flow of goods, information, and finances from sourcing to delivery. For insurance, we support full-spectrum operations, ensuring compliance and innovation, while HCM platforms manage the entire employee lifecycle for organizational success.",
+    //                   "display_name": "PromoText2",
+    //                   "reference": "Promo_PromoText2"
+    //               },
+    //               {
+    //                   "section": "Promo",
+    //                   "name": "PromoText3",
+    //                   "type": "Rich Text",
+    //                   "value": "Espire delivers a full range of services, including advisory and transformation planning, complete implementation and customization, integration with API connectivity, upgrades, cloud migration, ongoing support, data analytics, and user training. Our advisory team performs maturity assessments, process mapping, and ROI modeling to align technology with business goals. Certified consultants configure robust applications, while integration experts use iPaaS and microservices for seamless connections. We provide upgrades, managed support, and analytics for real-time insights, along with change management strategies like e-learning and gamified campaigns to ensure user adoption and continuous improvement.",
+    //                   "display_name": "PromoText3",
+    //                   "reference": "Promo_PromoText3"
+    //               }
+    //             ]
+    //   }
+    // };
+
     // let apiresponse = response1?.data?.result;
     // let finalResponse = tFields.reduce((acc: any[], item: any) => {
     //   const match = apiresponse.find((obj: any) =>
