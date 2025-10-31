@@ -6,6 +6,7 @@ import GetPageTemplates from "./GetPageTemplates";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import Settings from "./Settings";
 import upload from "../images/upload.png";
+import { Wrap, Button, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, useDisclosure } from "@chakra-ui/react";
 
 type UploadedFile = {
   name: string;
@@ -98,7 +99,9 @@ export default function DocumentImporter({
     setBrandWebsite((e.target as HTMLInputElement).value);
   };
 
+  const { isOpen, onOpen, onClose } = useDisclosure()
   return (
+    <>
     <div className={`${styles.container} max-w-5xl mx-auto p-6`}>
       <Settings prompt={promptValue} brandWebsite={brandWebsite} setPromptValue={getPromptValue} setBrandWebsite={getBrandWebsite} />
       <h1>Screen 1</h1>
@@ -109,7 +112,7 @@ export default function DocumentImporter({
         className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden document_importer_wrapper `}
       >
         <div
-          className={`${styles.cardInner} md:flex md:items-start md:gap-6 p-6 document_importer_inner`}
+          className={`${styles.cardInner} md:items-start md:gap-6 p-6 document_importer_inner`}
         >
           {/* Drag & Drop Area */}
           <div
@@ -210,5 +213,28 @@ export default function DocumentImporter({
         </div>
       </div>
     </div>
+
+    {/* Modal */}
+     <Button onClick={onOpen} className="modal-button-open flex">Open Modal</Button>
+
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Modal Title</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {/* <Lorem count={2} /> */}
+            hello
+          </ModalBody>
+
+          <ModalFooter>
+            <Button colorScheme='blue' mr={3} onClick={onClose}>
+              Close
+            </Button>
+            <Button variant='ghost'>Secondary Action</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </>
   );
 }
