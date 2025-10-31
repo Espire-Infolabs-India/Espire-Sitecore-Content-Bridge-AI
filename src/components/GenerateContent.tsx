@@ -109,7 +109,8 @@ export default function GenerateContent({
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
   const [formValues, setFormValues] = useState<FormValues>({}); // Rendering form values
   const [dsTemplate, setDsTemplate] = useState<string>("");
-  const [dsLocation, setDsLocation] = useState<string>("");
+  //const [templateDetails, setTemplateDetails = useState<any>();
+  const [dsLocation, setDsLocation] = useState<string>(""); 
 
   // ✅ NEW: Base template fields के अलग values
   const [baseFormValues, setBaseFormValues] = useState<FormValues>({}); // Base Page + _SEO values
@@ -125,6 +126,7 @@ export default function GenerateContent({
     name: string;
     path: string;
   }>(null);
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
 
   // Base templates (debug)
   const [baseTemplates, setBaseTemplates] = useState<
@@ -175,6 +177,7 @@ export default function GenerateContent({
   // ===================== original logic (renderings resolve) =====================
     // Parse XML & resolve ALL names for left renderings list
     useEffect(() => {
+      //setTemplateDetails(selectedTemplateData);
       setRenderings([]);
       setNameMap({});
       setActiveRenderingId("");
@@ -342,16 +345,20 @@ export default function GenerateContent({
             console.log("uniquePairsNew..........", uniquePairsNew, selectedFile);
 
             setIsBaseFormLoader(true);
+            setIsPageLoading(true);
             // render these fields to generate content from ai
-            const thirdPartyRes = await fetch("/api/chat-bot", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ selectedFile, tFields:uniquePairsNew as any, prompt, brandWebsite }),
-            });
-      
-            if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
-      
-            const data = await thirdPartyRes.json();
+            let data;
+            try {
+              const thirdPartyRes = await fetch("/api/chat-bot", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ selectedFile, tFields:uniquePairsNew as any, prompt, brandWebsite }),
+              });
+              if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
+              data = await thirdPartyRes.json();
+            } finally {
+              setIsPageLoading(false);
+            }
             let TempFinalResponse = data?.data?.result;
             // uncommented this code later for set page name
             let pageNameResponse = TempFinalResponse?.filter((item: any) => item.name == 'pageName');
@@ -370,7 +377,6 @@ export default function GenerateContent({
               return acc;
             }, []);
 
-            console.log("______________335_________finalResponse", finalResponse);
             setPageFieldTypePairs(finalResponse);
             // initialize base form values so BaseTemplate inputs show and control values
             const initialBaseValues: Record<string, string | boolean> = finalResponse.reduce(
@@ -403,6 +409,7 @@ export default function GenerateContent({
     if (!client || !sitecoreContextId) return;
     const componentId = normalizeGuid(componentIdRaw);
 
+    setIsPageLoading(true);
     setActiveRenderingId(componentId);
     setFields([]);
     setFormValues({});
@@ -419,7 +426,6 @@ export default function GenerateContent({
       }));
     }
 
-    // Clean the template value: remove anything after | and strip quotes
     const templateRaw = info.datasourceTemplateValue || "";
     const templateClean = templateRaw
       .split("|")[0]
@@ -430,43 +436,45 @@ export default function GenerateContent({
 
     if (!templateClean) return;
 
-    const tFields = await getTemplateFields(
-      client,
-      sitecoreContextId,
-      templateClean
-    );
-    //console.log("_______________________tFields", tFields);
-    let contentSummary = await generateContentSummary(tFields);
-    let currentTimeStamp = Date.now().toString().slice(-6);
-    let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
-    setNewItemName(compNameUnique);
+    try {
+      const tFields = await getTemplateFields(
+        client,
+        sitecoreContextId,
+        templateClean
+      );
+      
+      let contentSummary = await generateContentSummary(tFields);
+      let currentTimeStamp = Date.now().toString().slice(-6);
+      let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
+      setNewItemName(compNameUnique);
 
-    console.log("_______________________contentSummary after 0 ",contentSummary?.result);
-    let contentSummary1 = contentSummary?.result?.map(
-      (item: { name: any; reference: any }) => {
-        item.name = item.name;
-        return item;
+      let contentSummary1 = contentSummary?.result?.map(
+        (item: { name: any; reference: any }) => {
+          item.name = item.name;
+          return item;
+        }
+      );
+      setFields(contentSummary1);
+
+      // Initialize form values from AI-enriched field list so values render
+      const init: FormValues = {};
+      for (const f of contentSummary1 ?? []) {
+        if (f.type === "Checkbox") {
+          init[f.name] = Boolean(f.value);
+        } else {
+          init[f.name] = String(f.value ?? "");
+        }
       }
-    );
-    console.log("_______________________contentSummary after ",contentSummary1);
-
-    setFields(contentSummary1);
-
-    // Initialize form values from AI-enriched field list so values render
-    const init: FormValues = {};
-    for (const f of contentSummary1 ?? []) {
-      if (f.type === "Checkbox") {
-        init[f.name] = Boolean(f.value);
-      } else {
-        init[f.name] = String(f.value ?? "");
-      }
+      setFormValues(init);
+    } finally {
+      setIsPageLoading(false);
     }
-    setFormValues(init);
   };
 
   const generateContentSummary = async (tFields: any) => {
     try {
       setLoading(true);
+      setIsPageLoading(true);
       // 2️⃣ Send to third-party API
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
@@ -494,6 +502,7 @@ export default function GenerateContent({
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setLoading(false);
+      setIsPageLoading(false);
     }
   };
 
@@ -686,6 +695,7 @@ export default function GenerateContent({
     }
 
     try {
+      setIsPageLoading(true);
       setSaving(true);
 
       // Resolve template id from cleaned template path/ID
@@ -708,6 +718,7 @@ export default function GenerateContent({
       setSaveError(e?.message || "Failed to create datasource item.");
     } finally {
       setSaving(false);
+      setIsPageLoading(false);
     }
   };
 
@@ -726,6 +737,7 @@ export default function GenerateContent({
     }
 
     try {
+      setIsPageLoading(true);
       setCreatingPage(true);
 
       const pageMetas = pairsToMetas(pageFieldTypePairs);
@@ -742,17 +754,20 @@ export default function GenerateContent({
       }
 
       const item = await createItemFromTemplate(client, sitecoreContextId, {
-        name: newItemName.trim(),
+        name: newPageName.trim(),
         parentId:parentId,
-        templateId:dsTemplate,
+        templateId: "43c1bc5d831f47f89d03d3ba6602a0fd",
         fields: fieldsPayload,
       });
 
+      console.log('...............748.................',item);
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
+      setCreatingPage(false);
     } catch (e: any) {
       setSaveError(e?.message || "Failed to create datasource item.");
     } finally {
       setSaving(false);
+      setIsPageLoading(false);
     }
   };
 
@@ -762,6 +777,17 @@ export default function GenerateContent({
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {isPageLoading && (
+        <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex items-center gap-3 text-gray-700">
+            <svg className="animate-spin h-6 w-6 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span className="text-sm font-medium">Loading…</span>
+          </div>
+        </div>
+      )}
       <h1 className="text-3xl font-extrabold tracking-tight">Screen 3</h1>
       <Card
         title="Generate Content"
@@ -775,7 +801,7 @@ export default function GenerateContent({
       {/* 2) Base Template Fields (right under the header card) */}
       {isBaseFormLoader ? (
         <>
-          <h4>Loading the data from AI.....</h4>
+          <h4></h4>
         </>
       ) : (
         pageFieldTypePairs.length > 0 && (
@@ -1002,6 +1028,13 @@ export default function GenerateContent({
             <code>{pageCreated.itemId}</code>) — {pageCreated.path}
           </div>
         )}
+        
+         {created && (
+            <div className="text-sm text-green-700 mt-2">
+              Created: <strong>{created.name}</strong> (
+              <code>{created.itemId}</code>) — {created.path}
+            </div>
+          )}
       </Card>
     </div>
   );
