@@ -845,7 +845,38 @@ export default function GenerateContent({
 
       console.log('...............748.................',item);
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
-      setCreatingPage(false);
+     // setCreatingPage(false);
+      setPageCreated({ itemId: item.itemId, name: item.name, path: item.path });
+
+    // 1) Fetch the __Final Renderings XML for the newly-created page
+    const originalXml = await fetchFinalRenderingsXML(client!, sitecoreContextId, item.itemId);
+    setBlogFinalRenderingsXML(originalXml);
+    console.log("[BlogItemFinalRenderingsXML][ItemId]", item.itemId, originalXml);
+
+    // 2) Merge your saved datasource assignments into the fetched XML
+    //    (expects renderingDatasourceObjects: { renderingId, dataSourceId, ... }[])
+    const assignments =
+      (renderingDatasourceObjects ?? []).map((o: any) => ({
+        renderingId: o.renderingId,
+        dataSourceId: o.dataSourceId,
+      })) || [];
+
+    const mergedXml = mergeDatasourcesIntoFinalRenderingsXml(originalXml, assignments);
+    setBlogFinalRenderingsXMLUpdated(mergedXml);
+    console.log("[BlogItemFinalRenderingsXML:Updated][ItemId]", item.itemId, mergedXml);
+
+    // 3) Push the updated XML back to Sitecore (__Final Renderings)
+    if (mergedXml && mergedXml !== originalXml) {
+      await updateFinalRenderingsXML(client!, sitecoreContextId, item.itemId, mergedXml);
+      console.log("[UpdateFinalRenderingsXML][ok]", item.itemId);
+
+      // (optional quick verify)
+      // const persisted = await fetchFinalRenderingsXML(client!, sitecoreContextId, item.itemId);
+      // console.log("[BlogItemFinalRenderingsXML:Persisted][ItemId]", item.itemId, persisted);
+    } else {
+      console.log("[UpdateFinalRenderingsXML][no-change]", { itemId: item.itemId });
+    }
+
     } catch (e: any) {
       console.error("[CreateBlogPage][ERROR]", e);
       setPageError(e?.message || "Failed to create blog page.");
@@ -1086,7 +1117,7 @@ export default function GenerateContent({
                     Created: <strong>{created.name}</strong> (
                     <code>{created.itemId}</code>) — {created.path}
                   </div>
-                )}
+                )}                
               </Card>
 
               <div className="flex items-center gap-3">
