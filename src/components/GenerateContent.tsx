@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import GetMediaItems from "./GetMediaItems";
+import { PutBlobResult } from "@vercel/blob";
 
 import {
   getTemplateFields,
@@ -24,7 +25,7 @@ import {
   parseRenderingsFromXml,
   RenderingFromXml,
 } from "../utils/lib/parseRenderingsFromXml";
-import { PutBlobResult } from "@vercel/blob";
+
 
 interface ExtractedItem {
   name: string;
@@ -98,8 +99,7 @@ export default function GenerateContent({
   prompt: string | "";
   brandWebsite: string | "";
 }) {
-  const sitecoreContextId =
-    appContext?.resourceAccess?.[0]?.context?.preview ?? "";
+  const sitecoreContextId = appContext?.resourceAccess?.[0]?.context?.preview ?? "";
 
   const [renderings, setRenderings] = useState<RenderingFromXml[]>([]);
   const [nameMap, setNameMap] = useState<Record<string, RenderingInfo>>({});
@@ -111,10 +111,12 @@ export default function GenerateContent({
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
   const [formValues, setFormValues] = useState<FormValues>({}); // Rendering form values
   const [dsTemplate, setDsTemplate] = useState<string>("");
-  const [dsLocation, setDsLocation] = useState<string>("");
+  //const [templateDetails, setTemplateDetails = useState<any>();
+  const [dsLocation, setDsLocation] = useState<string>(""); 
 
   // Base template values
   const [baseFormValues, setBaseFormValues] = useState<FormValues>({}); // Base Page + _SEO values
+  const [isBaseFormLoader, setIsBaseFormLoader] = useState<boolean>(false);
 
   // Hard-coded parent (datasource creation)
   const PARENT_ID = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
@@ -126,6 +128,7 @@ export default function GenerateContent({
     name: string;
     path: string;
   }>(null);
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
 
   // Base templates
   const [baseTemplates, setBaseTemplates] = useState<
@@ -145,8 +148,9 @@ export default function GenerateContent({
     useState<any>(null);
 
   // FINAL: extracted field/type pairs from Page + _Seo Metadata (deduped by fieldName)
+
   const [pageFieldTypePairs, setPageFieldTypePairs] = useState<
-    { fieldName: string; fieldType: string }[]
+    { fieldName: string; fieldType: string, value: any }[]
   >([]);
 
   // ===================== Blog Page creation constants & state =====================
@@ -179,63 +183,64 @@ export default function GenerateContent({
   }
 
   // ===================== original logic (renderings resolve) =====================
-  // Parse XML & resolve ALL names for left renderings list
-  useEffect(() => {
-    setRenderings([]);
-    setNameMap({});
-    setActiveRenderingId("");
-    setFields([]);
-    setFormValues({});
-    setDsTemplate("");
-    setDsLocation("");
-    setNamesReady(false);
+    // Parse XML & resolve ALL names for left renderings list
+    useEffect(() => {
+      //setTemplateDetails(selectedTemplateData);
+      setRenderings([]);
+      setNameMap({});
+      setActiveRenderingId("");
+      setFields([]);
+      setFormValues({});
+      setDsTemplate("");
+      setDsLocation("");
+      setNamesReady(false);
 
-    if (
-      !client ||
-      !sitecoreContextId ||
-      !selectedTemplateData?.finalRenderings
-    ) {
-      setNamesReady(true);
-      return;
-    }
+      if (
+        !client ||
+        !sitecoreContextId ||
+        !selectedTemplateData?.finalRenderings
+      ) {
+        setNamesReady(true);
+        return;
+      }
 
-    const list = parseRenderingsFromXml(selectedTemplateData.finalRenderings);
-    setRenderings(list);
+      const list = parseRenderingsFromXml(selectedTemplateData.finalRenderings);
+      setRenderings(list);
 
-    if (list.length === 0) {
-      setNamesReady(true);
-      return;
-    }
+      if (list.length === 0) {
+        setNamesReady(true);
+        return;
+      }
 
-    const guids = Array.from(
-      new Set(list.map((r) => normalizeGuid(r.componentId)))
-    );
-
-    (async () => {
-      const results = await Promise.allSettled(
-        guids.map((g) => resolveRendering(client, sitecoreContextId, g))
+      const guids = Array.from(
+        new Set(list.map((r) => normalizeGuid(r.componentId)))
       );
 
-      const map: Record<string, RenderingInfo> = {};
-      for (let i = 0; i < results.length; i++) {
-        const res = results[i];
-        if (res.status === "fulfilled") {
-          const info = res.value;
-          const xmlGuid = guids[i];
-          map[normalizeGuid(info.itemId)] = info;
-          map[xmlGuid] = info;
+      (async () => {
+        const results = await Promise.allSettled(
+          guids.map((g) => resolveRendering(client, sitecoreContextId, g))
+        );
+
+        const map: Record<string, RenderingInfo> = {};
+        for (let i = 0; i < results.length; i++) {
+          const res = results[i];
+          if (res.status === "fulfilled") {
+            const info = res.value;
+            const xmlGuid = guids[i];
+            map[normalizeGuid(info.itemId)] = info;
+            map[xmlGuid] = info;
+          }
         }
-      }
-      setNameMap(map);
-      setNamesReady(true);
-    })();
+        setNameMap(map);
+        setNamesReady(true);
+      })();
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
   // helper: extract [{fieldName, fieldType}] from raw template tree
   function extractFieldTypePairs(
     raw: any
-  ): { fieldName: string; fieldType: string }[] {
-    const pairs: { fieldName: string; fieldType: string }[] = [];
+  ): { fieldName: string; fieldType: string, value: string }[] {
+    const pairs: { fieldName: string; fieldType: string, value:string }[] = [];
     try {
       const sectionNodes = raw?.children?.nodes ?? [];
       for (const section of sectionNodes) {
@@ -246,8 +251,9 @@ export default function GenerateContent({
             (n: any) => n?.name === "Type"
           );
           const fieldType = typeNode?.value ?? "";
+          let value = "";
           if (fieldName && fieldType) {
-            pairs.push({ fieldName, fieldType });
+            pairs.push({ fieldName, fieldType, value });
           }
         }
       }
@@ -266,6 +272,7 @@ export default function GenerateContent({
     (async () => {
       try {
         setPageFieldTypePairs([]);
+        var pagePairs;
 
         const nodes = await getBaseTemplatesByTemplateId(
           client!,
@@ -294,11 +301,11 @@ export default function GenerateContent({
               "en"
             );
             setPageTemplateDefinition(pageRaw);
-            const pagePairs = extractFieldTypePairs(pageRaw);
-            setPageFieldTypePairs(pagePairs);
+            pagePairs = extractFieldTypePairs(pageRaw);
+            //setPageFieldTypePairs(pagePairs);
           }
         } else {
-          console.log("[SCR3] Base template 'Page' not found.");
+          //console.log("[SCR3] Base template 'Page' not found.");
         }
 
         // 2) _SEO METADATA
@@ -321,24 +328,80 @@ export default function GenerateContent({
             const seoPairs = extractFieldTypePairs(seoRaw);
 
             // Merge & de-duplicate by fieldName
-            setPageFieldTypePairs((prev) => {
-              const all = [...prev, ...seoPairs];
-              const unique = all.reduce((acc, f) => {
-                if (!acc.some((x) => x.fieldName === f.fieldName)) acc.push(f);
-                return acc;
-              }, [] as { fieldName: string; fieldType: string }[]);
-              console.log(
-                "=== [SCR3][GraphQL][TemplateDefinition][Merged Page + _Seo Metadata][Unique] ==="
-              );
-              console.log(unique);
-              console.log(
-                "===================================================================="
-              );
-              return unique;
+            const all = [...pagePairs as [], ...seoPairs];
+            let uniquePairs = all.reduce((acc, f) => {
+              if (!acc.some((x:any) => x.fieldName === f.fieldName)) acc.push(f);
+              return acc;
+            }, [] as { fieldName: string; fieldType: string }[]);
+
+            let uniquePairsNew = uniquePairs.map((item:any) => {
+              return {
+                name: item.fieldName,
+                type: item.fieldType,
+                section: "BaseTemplate",
+                value: "",
+              };
             });
+
+            uniquePairsNew.push({
+              name: 'pageName',
+              type: 'Single-Line Text',
+              section: "BaseTemplate",
+              value: "",
+            })
+            
+            console.log("uniquePairsNew..........", uniquePairsNew, selectedFile);
+
+            setIsBaseFormLoader(true);
+            setIsPageLoading(true);
+            // render these fields to generate content from ai
+            let data;
+            try {
+              const thirdPartyRes = await fetch("/api/chat-bot", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ selectedFile, tFields:uniquePairsNew as any, prompt, brandWebsite }),
+              });
+              if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
+              data = await thirdPartyRes.json();
+            } finally {
+              setIsPageLoading(false);
+            }
+            let TempFinalResponse = data?.data?.result;
+            // uncommented this code later for set page name
+            let pageNameResponse = TempFinalResponse?.filter((item: any) => item.name == 'pageName');
+            setNewPageName(pageNameResponse[0]?.value);
+            
+            let finalResponse = uniquePairs.reduce((acc: any[], item: any) => {
+              const match = TempFinalResponse.find((obj: any) =>
+                obj.name == item?.fieldName
+              );
+
+              if (match) {
+                acc.push({ ...item, ...match });
+              }
+            
+              // if no match, just continue
+              return acc;
+            }, []);
+
+            setPageFieldTypePairs(finalResponse);
+            // initialize base form values so BaseTemplate inputs show and control values
+            const initialBaseValues: Record<string, string | boolean> = finalResponse.reduce(
+              (acc: Record<string, string | boolean>, it: any) => {
+                if (it?.fieldName) acc[it.fieldName] = String(it.value ?? "");
+                return acc;
+              },
+              {}
+            );
+            // if (pageNameResponse?.[0]?.value) {
+            //   initialBaseValues["pageName"] = String(pageNameResponse[0].value);
+            // }
+            setBaseFormValues(initialBaseValues);
+            setIsBaseFormLoader(false);
           }
         } else {
-          console.log("[SCR3] Base template '_Seo Metadata' not found.");
+          //console.log("[SCR3] Base template '_Seo Metadata' not found.");
         }
       } catch (err: any) {
         console.error(
@@ -354,6 +417,7 @@ export default function GenerateContent({
     if (!client || !sitecoreContextId) return;
     const componentId = normalizeGuid(componentIdRaw);
 
+    setIsPageLoading(true);
     setActiveRenderingId(componentId);
     setFields([]);
     setFormValues({});
@@ -370,7 +434,6 @@ export default function GenerateContent({
       }));
     }
 
-    // Clean the template value: remove anything after | and strip quotes
     const templateRaw = info.datasourceTemplateValue || "";
     const templateClean = templateRaw
       .split("|")[0]
@@ -381,57 +444,52 @@ export default function GenerateContent({
 
     if (!templateClean) return;
 
-    const tFields = await getTemplateFields(
-      client,
-      sitecoreContextId,
-      templateClean
-    );
-    console.log("_______________________tFields", tFields);
-    let contentSummary = await generateContentSummary(tFields);
-    let currentTimeStamp = Date.now().toString().slice(-6);
-    let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
-    setNewItemName(compNameUnique);
+    try {
+      const tFields = await getTemplateFields(
+        client,
+        sitecoreContextId,
+        templateClean
+      );
+      
+      let contentSummary = await generateContentSummary(tFields);
+      let currentTimeStamp = Date.now().toString().slice(-6);
+      let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
+      setNewItemName(compNameUnique);
 
-    console.log(
-      "_______________________contentSummary after 0 ",
-      contentSummary?.result
-    );
-    let contentSummary1 = contentSummary?.result?.map(
-      (item: { name: any; reference: any }) => {
-        item.name = item.reference;
-        return item;
+      let contentSummary1 = contentSummary?.result?.map(
+        (item: { name: any; reference: any }) => {
+          item.name = item.name;
+          return item;
+        }
+      );
+      setFields(tFields); // (unchanged list of real template fields)
+
+      // Initialize form values from AI-enriched field list so values render
+      const init: FormValues = {};
+      for (const f of contentSummary1 ?? []) {
+        if (f.type === "Checkbox") {
+          init[f.name] = Boolean(f.value);
+        } else {
+          init[f.name] = String(f.value ?? "");
+        }
       }
-    );
-    console.log(
-      "_______________________contentSummary after ",
-      contentSummary1
-    );
-
-    setFields(tFields); // (unchanged list of real template fields)
-
-    const init: FormValues = {};
-    for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
-    setFormValues(init);
+      setFormValues(init);
+    } finally {
+      setIsPageLoading(false);
+    }
   };
 
   const generateContentSummary = async (tFields: any) => {
     try {
       setLoading(true);
-      const file = selectedFile;
-      const response = await fetch(`/api/upload?filename=${file.name}`, {
-        method: "POST",
-        body: file,
-      });
-      const blob_url = (await response.json()) as PutBlobResult;
-      const uploadedFileName = blob_url.url;
-      console.log("............uploadedFileName", uploadedFileName);
+      setIsPageLoading(true);
 
       // 2️⃣ Send to third-party API
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          uploadedFileName,
+          selectedFile,
           tFields,
           prompt,
           brandWebsite,
@@ -458,6 +516,7 @@ export default function GenerateContent({
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setLoading(false);
+      setIsPageLoading(false);
     }
   };
 
@@ -612,7 +671,6 @@ export default function GenerateContent({
 
   /** Convert current form to simple [{name, value}] list for mutation */
   function toCreateFields(values: FormValues, metas: TemplateFieldMeta[]) {
-    console.log("__________toCreateFields______", values, metas);
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
       const raw = values[m.name];
@@ -683,6 +741,7 @@ export default function GenerateContent({
     }
 
     try {
+      setIsPageLoading(true);
       setSaving(true);
 
       // Resolve template id from cleaned template path/ID
@@ -735,6 +794,7 @@ export default function GenerateContent({
       setSaveError(e?.message || "Failed to create datasource item.");
     } finally {
       setSaving(false);
+      setIsPageLoading(false);
     }
   };
 
@@ -753,6 +813,7 @@ export default function GenerateContent({
     }
 
     try {
+      setIsPageLoading(true);
       setCreatingPage(true);
 
       // Build fields from Base Page + _SEO (whatever you've collected)
@@ -782,63 +843,16 @@ export default function GenerateContent({
         fields: fieldsPayload,
       });
 
-      // Keep your existing created indicator + dedicated pageCreated
+      console.log('...............748.................',item);
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
-
-      setPageCreated({ itemId: item.itemId, name: item.name, path: item.path });
-
-      // 1) Fetch the __Final Renderings XML for the newly-created page
-      const originalXml = await fetchFinalRenderingsXML(
-        client!,
-        sitecoreContextId,
-        item.itemId
-      );
-      setBlogFinalRenderingsXML(originalXml);
-      console.log(
-        "[BlogItemFinalRenderingsXML][ItemId]",
-        item.itemId,
-        originalXml
-      );
-
-      // 2) Merge your saved datasource assignments into the fetched XML
-      //    (expects renderingDatasourceObjects: { renderingId, dataSourceId, ... }[])
-      const assignments =
-        (renderingDatasourceObjects ?? []).map((o: any) => ({
-          renderingId: o.renderingId,
-          dataSourceId: o.dataSourceId,
-        })) || [];
-
-      const mergedXml = mergeDatasourcesIntoFinalRenderingsXml(
-        originalXml,
-        assignments
-      );
-      setBlogFinalRenderingsXMLUpdated(mergedXml);
-      console.log(
-        "[BlogItemFinalRenderingsXML:Updated][ItemId]",
-        item.itemId,
-        mergedXml
-      );
-
-      // 3) Push the updated XML back to Sitecore (__Final Renderings)
-      if (mergedXml && mergedXml !== originalXml) {
-        await updateFinalRenderingsXML(
-          client!,
-          sitecoreContextId,
-          item.itemId,
-          mergedXml
-        );
-        console.log("[UpdateFinalRenderingsXML][ok]", item.itemId);
-      } else {
-        console.log("[UpdateFinalRenderingsXML][no-change]", {
-          itemId: item.itemId,
-        });
-      }
+      setCreatingPage(false);
     } catch (e: any) {
       console.error("[CreateBlogPage][ERROR]", e);
       setPageError(e?.message || "Failed to create blog page.");
     } finally {
       setCreatingPage(false); // re-enable the Create Page button
       setSaving(false);
+      setIsPageLoading(false);
     }
   };
 
@@ -918,6 +932,18 @@ export default function GenerateContent({
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {isPageLoading && (
+        <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center" 
+        style={{ 'backgroundColor': 'rgba(0, 0, 0, 0.5)', 'zIndex': 9999 }}>
+          <div className="flex items-center gap-3 text-gray-700">
+            <svg className="animate-spin h-6 w-6 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span className="text-sm font-medium">Loading…</span>
+          </div>
+        </div>
+      )}
       <h1 className="text-3xl font-extrabold tracking-tight">Screen 3</h1>
       <Card
         title="Generate Content"
@@ -1088,64 +1114,69 @@ export default function GenerateContent({
         title="Create Blog Page"
         subtitle="Create a new blog page under ‘All Blogs’"
       >
-        {/* 2) Base Template Fields */}
-        {pageFieldTypePairs.length > 0 && (
-          <Card
-            title="Base Template Fields"
-            subtitle="Auto-generated from Page and _Seo Metadata templates"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
-                const meta: TemplateFieldMeta = {
-                  section: "BaseTemplate",
-                  name: fieldName,
-                  type: fieldType,
-                  value: undefined,
-                };
-                return (
-                  <label
-                    key={`BaseTemplate/${fieldName}-${index}`}
-                    className="block"
-                  >
-                    <div className="text-xs mb-1">
-                      <span className="font-semibold">{fieldName}</span>{" "}
-                      <span className="text-gray-500">({fieldType})</span>
-                    </div>
-                    {(() => {
-                      const k = meta.name;
-                      const v = baseFormValues[k];
-                      const set = (nv: string | boolean) =>
-                        setBaseFormValues((s) => ({ ...s, [k]: nv }));
-                      if (meta.type === "Checkbox") {
-                        return (
-                          <label className="inline-flex items-center gap-2">
-                            <input
-                              name={meta.name}
-                              type="checkbox"
-                              className="size-4"
-                              checked={Boolean(v)}
-                              onChange={(e) => set(e.target.checked)}
-                            />
-                            <span className="text-sm">Yes</span>
-                          </label>
-                        );
-                      }
+        {
+        isBaseFormLoader ? (
+          <>
+            <></>
+          </>
+        ) : (
+              pageFieldTypePairs.length > 0 && (
+                <Card
+                  title="Base Template Fields"
+                  subtitle="Auto-generated from Page and _Seo Metadata templates"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
+                      const meta: TemplateFieldMeta = {
+                        section: "BaseTemplate",
+                        name: fieldName,
+                        type: fieldType,
+                        value: undefined,
+                      };
                       return (
-                        <input
-                          className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                          name={meta.name}
-                          value={String(v ?? "")}
-                          onChange={(e) => set(e.target.value)}
-                        />
+                        <label
+                          key={`BaseTemplate/${fieldName}-${index}`}
+                          className="block"
+                        >
+                          <div className="text-xs mb-1">
+                            <span className="font-semibold">{fieldName}</span>{" "}
+                            <span className="text-gray-500">({fieldType})</span>
+                          </div>
+                          {(() => {
+                            const k = meta.name;
+                            const v = baseFormValues[k];
+                            const set = (nv: string | boolean) =>
+                              setBaseFormValues((s) => ({ ...s, [k]: nv }));
+                            if (meta.type === "Checkbox") {
+                              return (
+                                <label className="inline-flex items-center gap-2">
+                                  <input
+                                    name={meta.name}
+                                    type="checkbox"
+                                    className="size-4"
+                                    checked={Boolean(v)}
+                                    onChange={(e) => set(e.target.checked)}
+                                  />
+                                  <span className="text-sm">Yes</span>
+                                </label>
+                              );
+                            }
+                            return (
+                              <input
+                                className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                name={meta.name}
+                                value={String(v ?? "")}
+                                onChange={(e) => set(e.target.value)}
+                              />
+                            );
+                          })()}
+                        </label>
                       );
-                    })()}
-                  </label>
-                );
-              })}
-            </div>
-          </Card>
-        )}
-
+                    })}
+                  </div>
+                </Card>
+          )
+        )}           
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
             <label className="block text-xs font-semibold mb-1">
@@ -1179,6 +1210,13 @@ export default function GenerateContent({
             <code>{pageCreated.itemId}</code>) — {pageCreated.path}
           </div>
         )}
+        
+         {created && (
+            <div className="text-sm text-green-700 mt-2">
+              Created: <strong>{created.name}</strong> (
+              <code>{created.itemId}</code>) — {created.path}
+            </div>
+          )}
       </Card>
     </div>
   );
