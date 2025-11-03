@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import GetMediaItems from "./GetMediaItems";
-
+import { PutBlobResult } from "@vercel/blob";
 
 import {
   getTemplateFields,
@@ -14,6 +14,8 @@ import {
   getBaseTemplatesByTemplateId,
   getItemByPath,
   getTemplateDefinitionByPath,
+  fetchFinalRenderingsXML,
+  updateFinalRenderingsXML,
 } from "../utils/helper/cmsAuthoring";
 import type {
   TemplateFieldMeta,
@@ -94,8 +96,8 @@ export default function GenerateContent({
   client: ClientSDK | null;
   selectedTemplateData: ExtractedItem | null;
   selectedFile: any;
-  prompt: string | '';
-  brandWebsite: string | '';
+  prompt: string | "";
+  brandWebsite: string | "";
 }) {
   const sitecoreContextId = appContext?.resourceAccess?.[0]?.context?.preview ?? "";
 
@@ -112,11 +114,11 @@ export default function GenerateContent({
   //const [templateDetails, setTemplateDetails = useState<any>();
   const [dsLocation, setDsLocation] = useState<string>(""); 
 
-  // ✅ NEW: Base template fields के अलग values
+  // Base template values
   const [baseFormValues, setBaseFormValues] = useState<FormValues>({}); // Base Page + _SEO values
   const [isBaseFormLoader, setIsBaseFormLoader] = useState<boolean>(false);
 
-  // Hard-coded parent (as you wanted) — (datasource creation)
+  // Hard-coded parent (datasource creation)
   const PARENT_ID = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
   const [newItemName, setNewItemName] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -128,12 +130,12 @@ export default function GenerateContent({
   }>(null);
   const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
 
-  // Base templates (debug)
+  // Base templates
   const [baseTemplates, setBaseTemplates] = useState<
     Array<{ name: string; fullName: string; templateId: string }>
   >([]);
 
-  // getItemIdByPath result (debug)
+  // getItemIdByPath result
   const [pageBaseTemplateItem, setPageBaseTemplateItem] = useState<{
     itemId: string;
     name: string;
@@ -141,7 +143,7 @@ export default function GenerateContent({
     path: string;
   } | null>(null);
 
-  // RAW template definition (debug)
+  // RAW template definition
   const [pageTemplateDefinition, setPageTemplateDefinition] =
     useState<any>(null);
 
@@ -163,6 +165,12 @@ export default function GenerateContent({
     name: string;
     path: string;
   }>(null);
+
+  // Hold the __Final Renderings XML for the newly created Blog item
+  const [blogFinalRenderingsXML, setBlogFinalRenderingsXML] =
+    useState<string>("");
+  const [blogFinalRenderingsXMLUpdated, setBlogFinalRenderingsXMLUpdated] =
+    useState<string>("");
 
   function pairsToMetas(
     pairs: { fieldName: string; fieldType: string }[]
@@ -454,7 +462,7 @@ export default function GenerateContent({
           return item;
         }
       );
-      setFields(contentSummary1);
+      setFields(tFields); // (unchanged list of real template fields)
 
       // Initialize form values from AI-enriched field list so values render
       const init: FormValues = {};
@@ -475,11 +483,17 @@ export default function GenerateContent({
     try {
       setLoading(true);
       setIsPageLoading(true);
+
       // 2️⃣ Send to third-party API
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedFile, tFields, prompt, brandWebsite }),
+        body: JSON.stringify({
+          selectedFile,
+          tFields,
+          prompt,
+          brandWebsite,
+        }),
       });
 
       if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
@@ -516,7 +530,11 @@ export default function GenerateContent({
   }, [fields]);
 
   const renderInput = (f: TemplateFieldMeta) => {
+    // console.log("fields values", f);
     const k = f.name;
+    // const v = formValues[k];
+    // const set = (nv: string | boolean) =>
+    //   setFormValues((s) => ({ ...s, [k]: nv }));
     const isBase = f.section === "BaseTemplate";
     const v = isBase ? baseFormValues[k] : formValues[k];
     const set = (nv: string | boolean) => {
@@ -547,8 +565,7 @@ export default function GenerateContent({
             name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={4}
-            value={String((v ?? f.value) ?? "")}
-            data-text="On it....  "
+            value={String(v ?? f.value ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -559,7 +576,7 @@ export default function GenerateContent({
             name={f.name}
             type="number"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String((v ?? f.value) ?? "")}
+            value={String(v ?? f.value ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -569,7 +586,7 @@ export default function GenerateContent({
             name={f.name}
             type="date"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String((v ?? f.value) ?? "")}
+            value={String(v ?? f.value ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -579,7 +596,7 @@ export default function GenerateContent({
             name={f.name}
             type="datetime-local"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String((v ?? f.value) ?? "")}
+            value={String(v ?? f.value ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -590,7 +607,7 @@ export default function GenerateContent({
             type="url"
             placeholder="https://… or internal link"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String((v ?? f.value) ?? "")}
+            value={String(v ?? f.value ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -603,7 +620,7 @@ export default function GenerateContent({
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={2}
             placeholder="IDs/paths comma- or newline-separated"
-            value={String((v ?? f.value) ?? "")}
+            value={String(v ?? f.value ?? "")}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -611,33 +628,33 @@ export default function GenerateContent({
       case "Droptree":
       case "Image":
         return (
-           <>
-          <input
-            name={f.name}
-            type="file"
-            style={{ display: "none" }}
-            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            onChange={(e) => set(e.target.value)}
-          />
-          <GetMediaItems
-        appContext={appContext}
-        client={client}
-         onMediaSelect={(media) => {setFormValues((prev) => ({...prev,[f.name]: media.id, }));}}
-      />
+          <>
+            <input
+              name={f.name}
+              type="file"
+              style={{ display: "none" }}
+              className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              onChange={(e) => set(e.target.value)}
+            />
+            <GetMediaItems
+              appContext={appContext}
+              client={client}
+              onMediaSelect={(media) => {
+                setFormValues((prev) => ({ ...prev, [f.name]: media.id }));
+              }}
+            />
           </>
         );
       case "File":
         return (
           <>
             <input
-             name={f.name}
-        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 "
-        placeholder={f.source ? `source: ${f.source}` : ""}
-        value={String(v ?? "")}
-        onChange={(e) => set(e.target.value)}
-      />
-
-      
+              name={f.name}
+              className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 "
+              placeholder={f.source ? `source: ${f.source}` : ""}
+              value={String(v ?? "")}
+              onChange={(e) => set(e.target.value)}
+            />
           </>
         );
       default:
@@ -656,8 +673,6 @@ export default function GenerateContent({
   function toCreateFields(values: FormValues, metas: TemplateFieldMeta[]) {
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
-
-
       const raw = values[m.name];
       if (raw === undefined) continue;
 
@@ -666,10 +681,10 @@ export default function GenerateContent({
         case "Checkbox":
           value = (raw ? "1" : "0") as string;
           break;
-        case "Image":        
+        case "Image":
           value = `<image mediaid="${raw}" />`;
           break;
-        case "General Link":        
+        case "General Link":
           value = `<link linktype="external" url="${raw}" anchor="" target="" />`;
           break;
         default:
@@ -680,7 +695,38 @@ export default function GenerateContent({
     return list;
   }
 
-  const onSaveDatasource = async () => {    
+  // Single latest object (kept)
+  const [renderingDatasourceObject, setRenderingDatasourceObject] =
+    useState<null | {
+      renderingName: string;
+      renderingId: string;
+      dataSourceId: string;
+      dataSourcePath: string;
+    }>(null);
+
+  // ARRAY: keep ALL created datasource entries
+  const [renderingDatasourceObjects, setRenderingDatasourceObjects] = useState<
+    Array<{
+      renderingName: string;
+      renderingId: string;
+      dataSourceId: string;
+      dataSourcePath: string;
+    }>
+  >([]);
+
+  const HEX32 = /^[0-9A-F]{32}$/i;
+
+  function toBracedDashedGuid(raw: string): string | null {
+    if (!raw) return null;
+    const hex = raw.replace(/[{}-]/g, "").toUpperCase();
+    if (!HEX32.test(hex)) return null;
+    return `{${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
+      12,
+      16
+    )}-${hex.slice(16, 20)}-${hex.slice(20, 32)}}`;
+  }
+
+  const onSaveDatasource = async () => {
     setSaveError("");
     setCreated(null);
 
@@ -709,11 +755,41 @@ export default function GenerateContent({
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
         parentId: PARENT_ID,
-        templateId:templateId,
+        templateId: templateId,
         fields: fieldsPayload,
       });
 
+      // Normalize the datasource ID to proper {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} format
+      const normalizedDsId = toBracedDashedGuid(item.itemId);
+      if (!normalizedDsId) {
+        console.warn("[onSaveDatasource][invalid itemId format]", item.itemId);
+      }
+
+      const rdso = {
+        renderingName: nameMap[activeRenderingId]?.name ?? "",
+        renderingId: activeRenderingId,
+        dataSourceId: normalizedDsId ?? item.itemId, // fallback if normalization fails
+        dataSourcePath: item.path,
+      };
+
+      setRenderingDatasourceObject(rdso);
+      console.log("[RenderingDataSourceObject]", rdso);
+
+      setRenderingDatasourceObjects((s) => {
+        const next = [...s, rdso];
+        console.log("[RenderingDataSourceObject:All]", next);
+        return next;
+      });
+
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
+
+      // Fetch Final Renderings XML for the newly created item
+      const xml = await fetchFinalRenderingsXML(
+        client!,
+        sitecoreContextId,
+        item.itemId
+      );
+      setBlogFinalRenderingsXML(xml);
     } catch (e: any) {
       setSaveError(e?.message || "Failed to create datasource item.");
     } finally {
@@ -740,23 +816,30 @@ export default function GenerateContent({
       setIsPageLoading(true);
       setCreatingPage(true);
 
+      // Build fields from Base Page + _SEO (whatever you've collected)
       const pageMetas = pairsToMetas(pageFieldTypePairs);
       const fieldsPayload = toCreateFields(baseFormValues, pageMetas);
 
-      // Create the item (fields are inlined inside the mutation)
-      let parentId = PARENT_ID;
-      if (selectedInfo?.name?.toLowerCase().includes("carousel")) {
-        parentId = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
-      } else if (selectedInfo?.name?.toLowerCase().includes("promo")) {
-        parentId = "{8E44568A-E881-4CD9-A44F-399049DCF198}";
-      } else if (selectedInfo?.name?.toLowerCase().includes("image")) {
-        parentId = "{E812C7E5-8C9C-4848-A36A-B1FFB5B94387}";
-      }
+      // FORCE: Blog template (brace-wrapped, uppercased)
+      const templateId = "{43C1BC5D-831F-47F8-9D03-D3BA6602A0FD}";
+
+      // FORCE: Parent is “All Blogs”
+      const parentId = BLOG_PARENT_ID;
+
+      // Prefer the Page Name textbox, fallback to the auto item name if needed
+      const pageName = newPageName.trim() || newItemName.trim();
+
+      console.log("[CreateBlogPage][vars]", {
+        pageName,
+        parentId,
+        templateId,
+        fieldCount: fieldsPayload.length,
+      });
 
       const item = await createItemFromTemplate(client, sitecoreContextId, {
-        name: newPageName.trim(),
-        parentId:parentId,
-        templateId: "43c1bc5d831f47f89d03d3ba6602a0fd",
+        name: pageName,
+        parentId: parentId,
+        templateId: templateId,
         fields: fieldsPayload,
       });
 
@@ -764,12 +847,84 @@ export default function GenerateContent({
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
       setCreatingPage(false);
     } catch (e: any) {
-      setSaveError(e?.message || "Failed to create datasource item.");
+      console.error("[CreateBlogPage][ERROR]", e);
+      setPageError(e?.message || "Failed to create blog page.");
     } finally {
+      setCreatingPage(false); // re-enable the Create Page button
       setSaving(false);
       setIsPageLoading(false);
     }
   };
+
+  // Ensure {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} uppercase, with braces
+  function toDashedGuid(raw: string): string | null {
+    if (!raw) return null;
+    const hex = (raw || "").toUpperCase().replace(/[{}-]/g, "");
+    // must be exactly 32 hex
+    if (!/^[0-9A-F]{32}$/.test(hex)) return null;
+    const dashed = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
+      12,
+      16
+    )}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+    return `{${dashed}}`;
+  }
+
+  // Convenience normalizer for comparison (no braces/dashes, uppercase)
+  function norm32(raw: string): string {
+    return (raw || "").toUpperCase().replace(/[{}-]/g, "");
+  }
+
+  // === Helper: inject datasource IDs into Final Renderings XML ===
+  function mergeDatasourcesIntoFinalRenderingsXml(
+    xml: string,
+    assignments: Array<{ renderingId: string; dataSourceId: string }>
+  ): string {
+    if (!xml || !assignments?.length) return xml;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, "text/xml");
+    const rNodes = Array.from(doc.getElementsByTagName("r")); // all <r .../>
+
+    for (const r of rNodes) {
+      const sId = r.getAttribute("s:id");
+      if (!sId) continue;
+
+      const target = assignments.find(
+        (a) => norm32(a.renderingId) === norm32(sId)
+      );
+      if (!target) continue;
+
+      const dashedBracedDs = toDashedGuid(target.dataSourceId);
+      if (!dashedBracedDs) {
+        console.warn("[FinalRenderingsXML][skip-invalid-datasourceId]", {
+          renderingId: sId,
+          dataSourceId: target.dataSourceId,
+        });
+        continue; // do not write an invalid guid
+      }
+
+      r.setAttribute("s:ds", dashedBracedDs);
+    }
+
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(doc);
+  }
+
+  // Auto-merge Final Renderings XML when blogFinalRenderingsXML or renderings change
+  useEffect(() => {
+    if (!blogFinalRenderingsXML) return;
+
+    const merged = mergeDatasourcesIntoFinalRenderingsXml(
+      blogFinalRenderingsXML,
+      (renderingDatasourceObjects ?? []).map((o) => ({
+        renderingId: o.renderingId,
+        dataSourceId: o.dataSourceId,
+      }))
+    );
+
+    setBlogFinalRenderingsXMLUpdated(merged);
+    console.log("[BlogItemFinalRenderingsXML:Updated]", merged);
+  }, [blogFinalRenderingsXML, renderingDatasourceObjects]);
 
   const selectedInfo = activeRenderingId
     ? nameMap[activeRenderingId]
@@ -778,7 +933,8 @@ export default function GenerateContent({
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       {isPageLoading && (
-        <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center">
+        <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center" 
+        style={{ 'backgroundColor': 'rgba(0, 0, 0, 0.5)', 'zIndex': 9999 }}>
           <div className="flex items-center gap-3 text-gray-700">
             <svg className="animate-spin h-6 w-6 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -797,44 +953,6 @@ export default function GenerateContent({
             : "Select a template to continue"
         }
       />
-
-      {/* 2) Base Template Fields (right under the header card) */}
-      {isBaseFormLoader ? (
-        <>
-          <h4></h4>
-        </>
-      ) : (
-        pageFieldTypePairs.length > 0 && (
-          <Card
-            title="Base Template Fields"
-            subtitle="Auto-generated from Page and _Seo Metadata templates"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pageFieldTypePairs.map(({ fieldName, fieldType, value }, index) => {
-                const meta: TemplateFieldMeta = {
-                  section: "BaseTemplate",
-                  name: fieldName,
-                  type: fieldType,
-                  value: value,
-                };
-                return (
-                  <label
-                    key={`BaseTemplate/${fieldName}-${index}`}
-                    className="block"
-                  >
-                    <div className="text-xs mb-1">
-                      <span className="font-semibold">{fieldName}</span>
-                      <span className="text-gray-500">({fieldType})</span>
-                    </div>
-                    {renderInput(meta)}
-                  </label>
-                );
-              })}
-            </div>
-          </Card>
-        )
-      )}
-
 
       {/* 3) Renderings UI */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -923,7 +1041,7 @@ export default function GenerateContent({
                               <span className="text-gray-400">{` — ${f.source}`}</span>
                             ) : null}
                           </div>
-                          {/* 👇 add this line */}
+
                           {f.longDescription || f.shortDescription ? (
                             <div className="text-[11px] text-gray-600 mb-2 leading-snug">
                               Help Text:{" "}
@@ -996,18 +1114,80 @@ export default function GenerateContent({
         title="Create Blog Page"
         subtitle="Create a new blog page under ‘All Blogs’"
       >
+        {
+        isBaseFormLoader ? (
+          <>
+            <></>
+          </>
+        ) : (
+              pageFieldTypePairs.length > 0 && (
+                <Card
+                  title="Base Template Fields"
+                  subtitle="Auto-generated from Page and _Seo Metadata templates"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
+                      const meta: TemplateFieldMeta = {
+                        section: "BaseTemplate",
+                        name: fieldName,
+                        type: fieldType,
+                        value: undefined,
+                      };
+                      return (
+                        <label
+                          key={`BaseTemplate/${fieldName}-${index}`}
+                          className="block"
+                        >
+                          <div className="text-xs mb-1">
+                            <span className="font-semibold">{fieldName}</span>{" "}
+                            <span className="text-gray-500">({fieldType})</span>
+                          </div>
+                          {(() => {
+                            const k = meta.name;
+                            const v = baseFormValues[k];
+                            const set = (nv: string | boolean) =>
+                              setBaseFormValues((s) => ({ ...s, [k]: nv }));
+                            if (meta.type === "Checkbox") {
+                              return (
+                                <label className="inline-flex items-center gap-2">
+                                  <input
+                                    name={meta.name}
+                                    type="checkbox"
+                                    className="size-4"
+                                    checked={Boolean(v)}
+                                    onChange={(e) => set(e.target.checked)}
+                                  />
+                                  <span className="text-sm">Yes</span>
+                                </label>
+                              );
+                            }
+                            return (
+                              <input
+                                className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                name={meta.name}
+                                value={String(v ?? "")}
+                                onChange={(e) => set(e.target.value)}
+                              />
+                            );
+                          })()}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </Card>
+          )
+        )}           
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold mb-1">Page Name</label>
+            <label className="block text-xs font-semibold mb-1">
+              Page Name
+            </label>
             <input
               className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
               value={newPageName}
               onChange={(e) => setNewPageName(e.target.value)}
-              placeholder="e.g., Blog4"
+              placeholder="New Blog Item Name"
             />
-            <div className="text-xs text-gray-500 mt-1">
-              Parent: All Blogs ({BLOG_PARENT_ID}) • Template: Blog ({BLOG_TEMPLATE_ID})
-            </div>
           </div>
           <div className="flex items-end">
             <button
@@ -1021,7 +1201,9 @@ export default function GenerateContent({
           </div>
         </div>
 
-        {pageError && <div className="text-sm text-red-600 mt-2">{pageError}</div>}
+        {pageError && (
+          <div className="text-sm text-red-600 mt-2">{pageError}</div>
+        )}
         {pageCreated && (
           <div className="text-sm text-green-700 mt-2">
             Created: <strong>{pageCreated.name}</strong> (

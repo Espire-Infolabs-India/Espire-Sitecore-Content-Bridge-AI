@@ -134,7 +134,6 @@ export async function POST(req: Request) {
       content_type: JSON.stringify(newtFields, null, 2),
     };
 
-    console.log('____________payload in server',payload);
 
     const response = await axios.post(process.env.CHATBOT_CUSTOM_API_END_POINT || "", payload, {
       headers: {
@@ -144,7 +143,6 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log('____________response in server',response?.data);
 
       if(response?.data?.result && response?.data?.result?.length > 0){
         let apiresponse = response?.data?.result;

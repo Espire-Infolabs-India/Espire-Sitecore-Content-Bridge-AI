@@ -4,6 +4,7 @@ import { GET_RENDERING_DATASOURCE_FIELDS } from "../gqlQueries/getRenderingDatas
 import { GET_RENDERING_INFO } from "../gqlQueries/getRenderingInfo";
 import { GET_ITEM_ID_BY_PATH } from "../gqlQueries/getItemIdByPath";
 import { WHICH_BASE_TEMPLATES_BY_ID } from "../gqlQueries/getBaseTemplatesByTemplateId";
+import { GET_ITEM_FINAL_RENDERINGS } from "../gqlQueries/getItemFinalRenderings";
 
 type MutateReturn<T> = {
   data?: { data?: T; errors?: Array<{ message?: string }> };
@@ -394,4 +395,64 @@ export async function getTemplateDefinitionByPath(
 
   console.log("[SCR3][GraphQL][TemplateDefinition][ok]", data?.item);
   return data?.item ?? null;
+}
+
+
+/* ------------------- __Final Renderings (XML) helper ------------------- */
+
+type FinalRenderingsQueryResult = {
+  item?: { field?: { value?: string | null } | null } | null;
+};
+
+/**
+ * Fetch the "__Final Renderings" XML for a given itemId.
+ * Returns the XML string ("" if missing) and logs it.
+ */
+export async function fetchFinalRenderingsXML(
+  client: ClientSDK,
+  sitecoreContextId: string,
+  itemId: string
+): Promise<string> {
+  const id = normalizeGuid(itemId);
+  const query = GET_ITEM_FINAL_RENDERINGS(id);
+
+  const data = await callAuthoringGraphQL<FinalRenderingsQueryResult>(
+    client,
+    sitecoreContextId,
+    query
+  );
+
+  const xml = data?.item?.field?.value ?? "";
+  console.log("[BlogItemFinalRenderingsXML]", xml);
+  return xml;
+}
+
+import { UPDATE_FINAL_RENDERINGS } from "../gqlQueries/updateFinalRenderings";
+
+/** 
+ * Update __Final Renderings XML for a given item
+ */
+export async function updateFinalRenderingsXML(
+  client: ClientSDK,
+  sitecoreContextId: string,
+  itemId: string,
+  xml: string
+): Promise<void> {
+  const variables = {
+    itemId,
+    xml,
+  };
+
+  console.log("[UpdateFinalRenderingsXML][vars]", variables);
+
+  const payload = {
+    query: UPDATE_FINAL_RENDERINGS,
+    variables,
+  };
+
+  const res = await client.mutate("xmc.authoring.graphql", {
+    params: { query: { sitecoreContextId }, body: payload },
+  });
+
+  console.log("[UpdateFinalRenderingsXML][result]", res);
 }
