@@ -842,8 +842,6 @@ export default function GenerateContent({
         templateId: templateId,
         fields: fieldsPayload,
       });
-
-      console.log('...............748.................',item);
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
      // setCreatingPage(false);
       setPageCreated({ itemId: item.itemId, name: item.name, path: item.path });
@@ -851,7 +849,6 @@ export default function GenerateContent({
     // 1) Fetch the __Final Renderings XML for the newly-created page
     const originalXml = await fetchFinalRenderingsXML(client!, sitecoreContextId, item.itemId);
     setBlogFinalRenderingsXML(originalXml);
-    console.log("[BlogItemFinalRenderingsXML][ItemId]", item.itemId, originalXml);
 
     // 2) Merge your saved datasource assignments into the fetched XML
     //    (expects renderingDatasourceObjects: { renderingId, dataSourceId, ... }[])

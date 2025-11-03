@@ -62,7 +62,6 @@ export default function DocumentImporter({
         },
       );
       const blob_url = (await response.json()) as PutBlobResult;
-      console.log("blob_url", blob_url);
       setUploadedFileName(blob_url.url);
       
       const dataUrl = await readFileAsBase64(f);
