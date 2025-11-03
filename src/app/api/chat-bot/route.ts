@@ -126,6 +126,8 @@ export async function POST(req: Request) {
       type: item.type,
       section: item.section,
     }));
+    
+    console.log('...............newtFields',newtFields);
 
     const payload = {
       blob_url:selectedFile,

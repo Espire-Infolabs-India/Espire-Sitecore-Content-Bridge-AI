@@ -34,7 +34,7 @@ export default function DocumentImporter({
   const [promptValue, setPromptValue] = useState<string>("Rewrite in a more engaging style, but maintain all important details.");
   const [brandWebsite, setBrandWebsite] = useState<string>("https://www.oki.com/global/profile/brand/");
   const [uploadedFileName, setUploadedFileName] = useState<string>("https://olrnhwkh9qc8dffa.public.blob.vercel-storage.com/Espire%20Blog%20AI%20Sample%20Content.pdf");
-  const [isModalOpen, setModalOpen] = useState(false);
+  //const [isModalOpen, setModalOpen] = useState(false);
  
   const { isOpen, onOpen, onClose } = useDisclosure();
  
