@@ -6,6 +6,7 @@ import GetPageTemplates from "./GetPageTemplates";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import Settings from "./Settings";
 import upload from "../images/upload.png";
+import { PutBlobResult } from "@vercel/blob";
 import { Wrap, Button, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, useDisclosure } from "@chakra-ui/react";
 
 type UploadedFile = {
@@ -32,7 +33,7 @@ export default function DocumentImporter({
   const [showPageTemplates, setShowPageTemplates] = useState(false);
   const [promptValue, setPromptValue] = useState<string>("Rewrite in a more engaging style, but maintain all important details.");
   const [brandWebsite, setBrandWebsite] = useState<string>("https://www.oki.com/global/profile/brand/");
-
+  const [uploadedFileName, setUploadedFileName] = useState<string>("https://olrnhwkh9qc8dffa.public.blob.vercel-storage.com/Espire%20Blog%20AI%20Sample%20Content.pdf");
   const [isModalOpen, setModalOpen] = useState(false);
 
   const readFileAsBase64 = (file: File): Promise<string | ArrayBuffer | null> =>
@@ -48,6 +49,18 @@ export default function DocumentImporter({
     setLoading(true);
     try {
       setSelectedFile(f);
+
+      const fileDetails = f;
+      const response = await fetch(
+        `/api/upload?filename=${fileDetails?.name}`,
+        {
+          method: 'POST',
+          body: fileDetails,
+        },
+      );
+      const blob_url = (await response.json()) as PutBlobResult;
+      setUploadedFileName(blob_url.url);
+      
       const dataUrl = await readFileAsBase64(f);
       const base64 = String(dataUrl).split(",")[1] || "";
       setFile({
@@ -88,7 +101,7 @@ export default function DocumentImporter({
   };
 
   if (showPageTemplates) {
-    return <GetPageTemplates appContext={appContext} client={client} selectedFile={selectedFile} prompt={promptValue} brandWebsite={brandWebsite} />;
+    return <GetPageTemplates appContext={appContext} client={client} selectedFile={uploadedFileName} prompt={promptValue} brandWebsite={brandWebsite} />;
   }
 
   const getPromptValue = (e: React.SyntheticEvent) => {
