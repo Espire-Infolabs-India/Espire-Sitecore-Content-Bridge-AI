@@ -135,13 +135,6 @@ export default function DocumentImporter({
             setBrandWebsite={getBrandWebsite}
           />
  
-          <h1>Screen 1</h1>
-          <h3
-            className={`${styles.title} text-2xl font-semibold mb-4 text-center`}
-          >
-            Content Bridge AI
-          </h3>
- 
           <div
             className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden document_importer_wrapper`}
           >
@@ -258,9 +251,9 @@ export default function DocumentImporter({
       )}
  
       {/* Modal */}
-      <Button onClick={onOpen} className="modal-button-open flex">
+      {/* <Button onClick={onOpen} className="modal-button-open flex">
         Open Modal
-      </Button>
+      </Button> */}
  
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />
