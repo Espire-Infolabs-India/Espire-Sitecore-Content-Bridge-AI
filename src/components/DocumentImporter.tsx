@@ -1,13 +1,12 @@
 "use client";
 import React, { useRef, useState } from "react";
 import Image from "next/image";
-import styles from "./DocumentImporter.module.css";
 import GetPageTemplates from "./GetPageTemplates";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import Settings from "./Settings";
 import upload from "../images/upload.png";
 import { PutBlobResult } from "@vercel/blob";
-import { Wrap, Button, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, useDisclosure } from "@chakra-ui/react";
+import { Box, Flex, Text, Stack, Button, Input, Spinner } from "@chakra-ui/react";
 
 type UploadedFile = {
   name: string;
@@ -27,16 +26,12 @@ export default function DocumentImporter({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<UploadedFile | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [showPageTemplates, setShowPageTemplates] = useState(false);
   const [promptValue, setPromptValue] = useState<string>("Rewrite in a more engaging style, but maintain all important details.");
   const [brandWebsite, setBrandWebsite] = useState<string>("https://www.oki.com/global/profile/brand/");
   const [uploadedFileName, setUploadedFileName] = useState<string>("https://olrnhwkh9qc8dffa.public.blob.vercel-storage.com/Espire%20Blog%20AI%20Sample%20Content.pdf");
   //const [isModalOpen, setModalOpen] = useState(false);
- 
-  const { isOpen, onOpen, onClose } = useDisclosure();
  
   // --- Helpers ---
   const readFileAsBase64 = (file: File): Promise<string | ArrayBuffer | null> =>
@@ -51,8 +46,6 @@ export default function DocumentImporter({
     if (!f) return;
     setLoading(true);
     try {
-      setSelectedFile(f);
-
       const fileDetails = f;
       const response = await fetch(
         `/api/upload?filename=${fileDetails?.name}`,
@@ -64,15 +57,7 @@ export default function DocumentImporter({
       const blob_url = (await response.json()) as PutBlobResult;
       setUploadedFileName(blob_url.url);
       
-      const dataUrl = await readFileAsBase64(f);
-      const base64 = String(dataUrl).split(",")[1] || "";
-      setFile({
-        name: f.name,
-        size: f.size,
-        type: f.type,
-        base64,
-        original: f,
-      });
+      setFile({ name: f.name, size: f.size, type: f.type, base64: "", original: f });
     } catch (err) {
       console.error(err);
       alert("Failed to read file");
@@ -99,7 +84,6 @@ export default function DocumentImporter({
   const reset = () => {
     setFile(null);
     setLoading(false);
-    setImporting(false);
     inputRef.current && (inputRef.current.value = "");
   };
 
@@ -118,157 +102,83 @@ export default function DocumentImporter({
   // --- Render ---
   return (
     <>
-      {showPageTemplates ? (
-        <GetPageTemplates
-          appContext={appContext}
-          client={client}
-          selectedFile={selectedFile}
-          prompt={promptValue}
-          brandWebsite={brandWebsite}
-        />
-      ) : (
-        <div className={`${styles.container} max-w-5xl mx-auto p-6`}>
+      {!showPageTemplates && (
+        <Box maxW="5xl" mx="auto" p={6}>
           <Settings
             prompt={promptValue}
             brandWebsite={brandWebsite}
             setPromptValue={getPromptValue}
             setBrandWebsite={getBrandWebsite}
-          />
+          /><br />
  
-          <div
-            className={`${styles.card} border rounded-lg bg-white shadow-sm overflow-hidden document_importer_wrapper`}
-          >
-            <div
-              className={`${styles.cardInner} md:items-start md:gap-6 p-6 document_importer_inner`}
-            >
+          <Box borderWidth="1px" rounded="lg" bg="white" shadow="sm" overflow="hidden">
+            <Box p={6}>
               {/* Drag & Drop Area */}
-              <div
-                className={styles.left}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={onDrop}
-              >
-                <div
+              <Box onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+                <Box
                   role="button"
                   tabIndex={0}
                   onClick={onChooseClick}
-                  className={`${styles.dropArea} document_importer_button relative rounded-md h-48 flex flex-col items-center justify-center p-6 cursor-pointer transition-colors ${
-                    loading ? "opacity-70" : "hover:bg-gray-50"
-                  }`}
+                  position="relative"
+                  rounded="md"
+                  h="12rem"
+                  display="flex"
+                  flexDir="column"
+                  alignItems="center"
+                  justifyContent="center"
+                  p={6}
+                  cursor="pointer"
+                  transition="background 0.2s ease"
+                  borderWidth="2px"
+                  borderStyle="dashed"
+                  borderColor="gray.300"
+                  _hover={{ bg: !loading ? "gray.50" : undefined }}
+                  opacity={loading ? 0.7 : 1}
                 >
                   <Image src={upload} alt="upload image" width={30} height={30} />
-                  <div className={`${styles.dropNote} document_importer_note`}>
-                    Drag & drop or
-                  </div>
-                  <div
-                    className={`${styles.previewText} mt-2 text-sm text-gray-700 document_importer_text`}
-                  >
-                    <strong className="text-indigo-600 document_importer_choosefile">
-                      Choose File
-                    </strong>{" "}
-                    to upload
-                  </div>
-                  <div
-                    className={`${styles.supportText} italic mt-1 text-xs text-gray-400 document_importer_text`}
-                  >
+                  <Text mt={2} color="gray.600">Drag & drop or</Text>
+                  <Text mt={1} fontSize="sm" color="gray.700">
+                    <Text as="span" color="blue.600" fontWeight="semibold">Choose File</Text> to upload
+                  </Text>
+                  <Text mt={1} fontSize="xs" color="gray.400" fontStyle="italic">
                     Supported formats: PDF, DOCX, DOC, TXT
-                  </div>
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    accept=".pdf, .docx, .doc, .txt"
-                    onChange={onInputChange}
-                    className={styles.hiddenInput}
-                  />
+                  </Text>
+                  <Input ref={inputRef} type="file" accept=".pdf, .docx, .doc, .txt" onChange={onInputChange} display="none" />
                   {loading && (
-                    <div className={styles.loadingOverlay}>
-                      <div className="flex items-center gap-2">
-                        <div className={`${styles.spinner} h-5 w-5`} />
-                        <span className="text-sm text-gray-600">
-                          Loading file…
-                        </span>
-                      </div>
-                    </div>
+                    <Box position="absolute" inset={0} bg="blackAlpha.200" display="flex" alignItems="center" justifyContent="center">
+                      <Stack direction="row" spacing={2} align="center">
+                        <Spinner size="sm" />
+                        <Text fontSize="sm" color="gray.700">Loading file…</Text>
+                      </Stack>
+                    </Box>
                   )}
-                </div>
+                </Box>
  
                 {/* Selected File details */}
-                <div className="mt-4 px-2 flex justify-between items-center">
+                <Flex mt={4} px={2} justify="space-between" align="center">
                   {file ? (
-                    <div
-                      className={`${styles.fileBox} text-sm document_importer_filename`}
-                    >
-                      <div>
-                        <div className={styles.fileName}>{file.name}</div>
-                        <div className={styles.fileSize}>
-                          {Math.round(file.size / 1024)} KB
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={reset}
-                          className={`${styles.btn} ${styles.cancelBtn} document_importer_removebutton`}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
+                    <Flex fontSize="sm" gap={4} align="center">
+                      <Box>
+                        <Text fontWeight="semibold">{file.name}</Text>
+                        <Text color="gray.600">{Math.round(file.size / 1024)} KB</Text>
+                      </Box>
+                      <Button variant="ghost" colorScheme="red" onClick={reset}>Remove</Button>
+                    </Flex>
                   ) : (
-                    <div className="text-base text-gray-500">
-                      No file selected
-                    </div>
+                    <Text fontSize="md" color="gray.500">No file selected</Text>
                   )}
  
                   {/* Footer Buttons */}
-                  <div className={`${styles.footer} document_importer_footer`}>
-                    <button
-                      onClick={reset}
-                      className={`${styles.btn} ${styles.cancelBtn}`}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleImport}
-                      disabled={!file || loading || importing}
-                      className={`${styles.importBtn} ${
-                        !file || loading || importing ? styles.disabled : ""
-                      } document_importer`}
-                    >
-                      {importing ? (
-                        <>
-                          <span className={styles.spinner} />
-                          Importing…
-                        </>
-                      ) : (
-                        "Import"
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+                  <Stack direction={{ base: "column", sm: "row" }} spacing={3}>
+                    <Button onClick={reset} variant="outline" colorScheme="gray">Cancel</Button>
+                    <Button onClick={handleImport} isDisabled={!file || loading} colorScheme="danger">Import</Button>
+                  </Stack>
+                </Flex>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
       )}
- 
-      {/* Modal */}
-      {/* <Button onClick={onOpen} className="modal-button-open flex">
-        Open Modal
-      </Button> */}
- 
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Modal Title</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>hello</ModalBody>
-          <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={onClose}>
-              Close
-            </Button>
-            <Button variant="ghost">Secondary Action</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </>
   );
 }
