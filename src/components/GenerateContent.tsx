@@ -186,6 +186,7 @@ export default function GenerateContent({
     // Parse XML & resolve ALL names for left renderings list
     useEffect(() => {
       //setTemplateDetails(selectedTemplateData);
+      setIsPageLoading(true);
       setRenderings([]);
       setNameMap({});
       setActiveRenderingId("");
@@ -514,6 +515,7 @@ export default function GenerateContent({
         "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
       );
       window.scrollTo({ top: 0, behavior: "smooth" });
+      setIsPageLoading(false);
     } finally {
       setLoading(false);
       setIsPageLoading(false);
@@ -972,7 +974,6 @@ export default function GenerateContent({
           </div>
         </div>
       )}
-      <h1 className="text-3xl font-extrabold tracking-tight">Screen 3</h1>
       <Card
         title="Generate Content"
         subtitle={
