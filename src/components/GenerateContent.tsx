@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import GetMediaItems from "./GetMediaItems";
-import { PutBlobResult } from "@vercel/blob";
+import { Box, Button, Heading, Text, Stack, Spinner, Alert, AlertIcon, AlertDescription } from "@chakra-ui/react";
 
 import {
   getTemplateFields,
@@ -46,19 +46,17 @@ function Chip({
   onClick?: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       title={title}
       onClick={onClick}
-      className={[
-        "px-3 py-1 rounded-full border text-sm transition",
-        active
-          ? "bg-gray-900 text-white border-gray-900"
-          : "bg-white text-gray-900 hover:bg-gray-100",
-      ].join(" ")}
+      size="sm"
+      variant={active ? "solid" : "outline"}
+      colorScheme="gray"
+      borderRadius="full"
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -72,15 +70,15 @@ function Card({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border p-4 bg-white shadow-sm">
-      <div className="mb-3">
-        <div className="text-base font-semibold">{title}</div>
+    <Box borderWidth="1px" borderRadius="2xl" p={4} mb="10" bg="white" shadow="sm">
+      <Box mb={3}>
+        <Heading as="div" size="sm">{title}</Heading>
         {subtitle ? (
-          <div className="text-xs text-gray-500 mt-0.5">{subtitle}</div>
+          <Text fontSize="xs" color="gray.500" mt={0.5}>{subtitle}</Text>
         ) : null}
-      </div>
+      </Box>
       {children}
-    </div>
+    </Box>
   );
 }
 
@@ -210,6 +208,7 @@ export default function GenerateContent({
 
       if (list.length === 0) {
         setNamesReady(true);
+        setIsPageLoading(false);
         return;
       }
 
@@ -234,6 +233,7 @@ export default function GenerateContent({
         }
         setNameMap(map);
         setNamesReady(true);
+        //setIsPageLoading(false);
       })();
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
@@ -961,21 +961,17 @@ export default function GenerateContent({
     : undefined;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <Box p={6} maxW="6xl" mx="auto">
       {isPageLoading && (
-        <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center" 
-        style={{ 'backgroundColor': 'rgba(0, 0, 0, 0.5)', 'zIndex': 9999 }}>
-          <div className="flex items-center gap-3 text-gray-700">
-            <svg className="animate-spin h-6 w-6 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-            </svg>
-            <span className="text-sm font-medium">Loading…</span>
-          </div>
-        </div>
+        <Box position="fixed" inset={0} zIndex={9999} bg="blackAlpha.600" display="flex" alignItems="center" justifyContent="center">
+          <Stack direction="row" spacing={3} align="center" color="gray.100">
+            <Spinner size="md" thickness='3px' speed='0.65s' emptyColor='whiteAlpha.300' color='white' />
+            <Text fontSize="sm" fontWeight="medium">Loading…</Text>
+          </Stack>
+        </Box>
       )}
-      <Card
-        title="Generate Content"
+
+      <Card title="Generate Content"
         subtitle={
           selectedTemplateData
             ? `Template: ${selectedTemplateData.name} • Page Item ID: ${selectedTemplateData.itemID}`
@@ -984,21 +980,21 @@ export default function GenerateContent({
       />
 
       {/* 3) Renderings UI */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <Box display="grid" gridTemplateColumns={{ base: '1fr', lg: '1fr 1fr 1fr' }} gap={6}>
         <Card
           title="Renderings"
           subtitle="Click a rendering to load its fields"
         >
           {!namesReady ? (
-            <div className="space-y-2">
-              <div className="h-7 w-28 rounded-full bg-gray-200 animate-pulse" />
-              <div className="h-7 w-36 rounded-full bg-gray-200 animate-pulse" />
-              <div className="h-7 w-24 rounded-full bg-gray-200 animate-pulse" />
-              <div className="text-xs text-gray-500">Resolving renderings…</div>
-            </div>
+            <Stack spacing={2}>
+              <Box h={7} w={28} borderRadius="full" bg="gray.200" className="animate-pulse" />
+              <Box h={7} w={36} borderRadius="full" bg="gray.200" className="animate-pulse" />
+              <Box h={7} w={24} borderRadius="full" bg="gray.200" className="animate-pulse" />
+              <Text fontSize="xs" color="gray.500">Resolving renderings…</Text>
+            </Stack>
           ) : (
-            <div className="space-y-3">
-              <ul className="flex flex-wrap gap-2">
+            <Stack spacing={3}>
+              <Box as="ul" display="flex" flexWrap="wrap" gap={2}>
                 {renderings.map((r) => {
                   const guid = normalizeGuid(r.componentId);
                   const info = nameMap[guid];
@@ -1025,22 +1021,22 @@ export default function GenerateContent({
                     .join("\n");
 
                   return (
-                    <li key={r.uid}>
+                    <Box as="li" key={r.uid}>
                       <Chip
                         label={info.name}
                         title={tooltip}
                         active={activeRenderingId === guid}
                         onClick={() => onClickRendering(guid, info.name)}
                       />
-                    </li>
+                    </Box>
                   );
                 })}
-              </ul>
-            </div>
+              </Box>
+            </Stack>
           )}
         </Card>
 
-        <div className="lg:col-span-2 space-y-6">
+        <Box gridColumn={{ lg: 'span 2' }}>
           {fields.length > 0 ? (
             <>
               <Card
@@ -1054,107 +1050,80 @@ export default function GenerateContent({
               >
                 {/* Dynamic form */}
                 {[...grouped.entries()].map(([section, items]) => (
-                  <div key={section || "default"} className="mb-5 last:mb-0">
-                    <div className="text-sm font-medium text-gray-700 mb-2">
-                      {section || "Fields"}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Box key={section || 'default'} mb={5}>
+                    <Text fontSize="sm" fontWeight="medium" color="gray.700" mb={2}>{section || 'Fields'}</Text>
+                    <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={4}>
                       {items.map((f, i) => (
-                        <label key={`${section}/${i}`} className="block">
-                          <div className="text-xs mb-1">
-                            <span className="font-semibold">{f.name}</span>{" "}
-                            <span className="text-gray-500">
-                              ({f.type || "Text"})
-                            </span>
+                        <Box as="label" key={`${section}/${i}`} display="block">
+                          <Box fontSize="xs" mb={1}>
+                            <Text as="span" fontWeight="semibold">{f.name}</Text>{' '}
+                            <Text as="span" color="gray.500">({f.type || 'Text'})</Text>
                             {f.source ? (
-                              <span className="text-gray-400">{` — ${f.source}`}</span>
+                              <Text as="span" color="gray.400">{` — ${f.source}`}</Text>
                             ) : null}
-                          </div>
-
+                          </Box>
                           {f.longDescription || f.shortDescription ? (
-                            <div className="text-[11px] text-gray-600 mb-2 leading-snug">
-                              Help Text:{" "}
-                              {f.longDescription || f.shortDescription}
-                            </div>
+                            <Text fontSize="xs" color="gray.600" mb={2} lineHeight="short">
+                              Help Text: {f.longDescription || f.shortDescription}
+                            </Text>
                           ) : null}
                           {renderInput(f)}
-                        </label>
+                        </Box>
                       ))}
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
                 ))}
 
                 {/* Create item controls */}
-                <div className="mt-4 flex items-end gap-3">
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold mb-1">
-                      Item Name
-                    </label>
-                    <input
-                      className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                      value={newItemName}
-                      onChange={(e) => setNewItemName(e.target.value)}
-                      placeholder="e.g., CarouselItem1"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onSaveDatasource}
-                    disabled={saving}
-                    className="px-4 py-2 rounded-lg border bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-60"
-                  >
-                    {saving ? "Saving…" : "Save Datasource"}
-                  </button>
-                </div>
+                <Stack direction={{ base: 'column', md: 'row' }} mt={4} align="end" spacing={3}>
+                  <Box flex="1">
+                    <Text as="label" display="block" fontSize="xs" fontWeight="semibold" mb={1}>Item Name</Text>
+                    <Box as="input" w="full" borderWidth="1px" borderRadius="lg" p={2} _focus={{ outline: 'none', ring: 2, ringColor: 'gray.300' }} value={newItemName} onChange={(e: any) => setNewItemName(e.target.value)} placeholder="e.g., CarouselItem1" />
+                  </Box>
+                  
+                </Stack>
+                <Stack direction="row" align="center" spacing={3} mt={5}>
+                  <Button type="button" onClick={onSaveDatasource} isDisabled={saving} colorScheme="gray">
+                    {saving ? 'Saving…' : 'Save Datasource'}
+                  </Button>
+                    <Button variant="outline" onClick={() => setFormValues({})}>Reset Form</Button>
+                </Stack>
 
                 {saveError && (
-                  <div className="text-sm text-red-600 mt-2">{saveError}</div>
+                  <Text fontSize="sm" color="red.600" mt={2}>{saveError}</Text>
                 )}
                 {created && (
-                  <div className="text-sm text-green-700 mt-2">
-                    Created: <strong>{created.name}</strong> (
-                    <code>{created.itemId}</code>) — {created.path}
-                  </div>
+                  <Alert status="success" mt={2} borderRadius={10} fontSize="14px">
+                    <AlertIcon />
+                    <AlertDescription> Created: <strong>{created.name}</strong> (<code>{created.itemId}</code>) — {created.path}</AlertDescription>
+                </Alert>
                 )}                
               </Card>
 
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-lg border hover:bg-gray-50"
-                  onClick={() => setFormValues({})}
-                >
-                  Reset Form
-                </button>
-              </div>
+              
             </>
           ) : (
             <Card title="No rendering selected">
-              <div className="text-sm text-gray-600">
-                Choose a rendering on the left to see its fields.
-              </div>
+              <Text fontSize="sm" color="gray.600">Choose a rendering on the left to see its fields.</Text>
             </Card>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {/* === BOTTOM: Create Blog Page === */}
       <Card
         title="Create Blog Page"
         subtitle="Create a new blog page under ‘All Blogs’"
       >
-        {
-        isBaseFormLoader ? (
-          <>
-            <></>
-          </>
+        {isBaseFormLoader ? (
+          <></>
         ) : (
               pageFieldTypePairs.length > 0 && (
                 <Card
                   title="Base Template Fields"
                   subtitle="Auto-generated from Page and _Seo Metadata templates"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={4}>
                     {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
                       const meta: TemplateFieldMeta = {
                         section: "BaseTemplate",
@@ -1163,14 +1132,11 @@ export default function GenerateContent({
                         value: undefined,
                       };
                       return (
-                        <label
-                          key={`BaseTemplate/${fieldName}-${index}`}
-                          className="block"
-                        >
-                          <div className="text-xs mb-1">
-                            <span className="font-semibold">{fieldName}</span>{" "}
-                            <span className="text-gray-500">({fieldType})</span>
-                          </div>
+                        <Box as="label" key={`BaseTemplate/${fieldName}-${index}`} display="block">
+                          <Box fontSize="xs" mb={1}>
+                            <Text as="span" fontWeight="semibold">{fieldName}</Text>{' '}
+                            <Text as="span" color="gray.500">({fieldType})</Text>
+                          </Box>
                           {(() => {
                             const k = meta.name;
                             const v = baseFormValues[k];
@@ -1178,75 +1144,48 @@ export default function GenerateContent({
                               setBaseFormValues((s) => ({ ...s, [k]: nv }));
                             if (meta.type === "Checkbox") {
                               return (
-                                <label className="inline-flex items-center gap-2">
-                                  <input
-                                    name={meta.name}
-                                    type="checkbox"
-                                    className="size-4"
-                                    checked={Boolean(v)}
-                                    onChange={(e) => set(e.target.checked)}
-                                  />
-                                  <span className="text-sm">Yes</span>
-                                </label>
+                                <Box as="label" display="inline-flex" alignItems="center" gap={2}>
+                                  <Box as="input" name={meta.name} type="checkbox" w={4} h={4} checked={Boolean(v)} onChange={(e: any) => set(e.target.checked)} />
+                                  <Text fontSize="sm">Yes</Text>
+                                </Box>
                               );
                             }
                             return (
-                              <input
-                                className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                name={meta.name}
-                                value={String(v ?? "")}
-                                onChange={(e) => set(e.target.value)}
-                              />
+                              <Box as="input" w="full" borderWidth="1px" borderRadius="lg" p={2} _focus={{ outline: 'none', ring: 2, ringColor: 'gray.300' }} name={meta.name} value={String(v ?? '')} onChange={(e: any) => set(e.target.value)} />
                             );
                           })()}
-                        </label>
+                        </Box>
                       );
                     })}
-                  </div>
+                  </Box>
                 </Card>
           )
         )}           
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold mb-1">
-              Page Name
-            </label>
-            <input
-              className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              value={newPageName}
-              onChange={(e) => setNewPageName(e.target.value)}
-              placeholder="New Blog Item Name"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={onCreateBlogPage}
-              disabled={creatingPage}
-              className="px-4 py-2 rounded-lg border bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-60"
-            >
-              {creatingPage ? "Creating…" : "Create Page"}
-            </button>
-          </div>
-        </div>
+        <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '2fr 1fr' }} gap={4}>
+          <Box>
+            <Text as="label" display="block" fontSize="xs" fontWeight="semibold" mb={1}>Page Name</Text>
+            <Box as="input" w="full" borderWidth="1px" borderRadius="lg" p={2} _focus={{ outline: 'none', ring: 2, ringColor: 'gray.300' }} value={newPageName} onChange={(e: any) => setNewPageName(e.target.value)} placeholder="New Blog Item Name" />
+          </Box>
+          <Box display="flex" alignItems="flex-end">
+            <Button type="button" onClick={onCreateBlogPage} isDisabled={creatingPage} colorScheme="gray">
+              {creatingPage ? 'Creating…' : 'Create Page'}
+            </Button>
+          </Box>
+        </Box>
 
         {pageError && (
-          <div className="text-sm text-red-600 mt-2">{pageError}</div>
+          <Alert status="error" mt={2} borderRadius={10}>
+              <AlertIcon />
+              <AlertDescription>{pageError}</AlertDescription>
+          </Alert>
         )}
         {pageCreated && (
-          <div className="text-sm text-green-700 mt-2">
-            Created: <strong>{pageCreated.name}</strong> (
-            <code>{pageCreated.itemId}</code>) — {pageCreated.path}
-          </div>
+          <Alert status="success" mt={2} borderRadius={10} fontSize="14px">
+              <AlertIcon />
+              <AlertDescription>Created: <strong>{pageCreated.name}</strong> (<code>{pageCreated.itemId}</code>) — {pageCreated.path}</AlertDescription>
+          </Alert>
         )}
-        
-         {created && (
-            <div className="text-sm text-green-700 mt-2">
-              Created: <strong>{created.name}</strong> (
-              <code>{created.itemId}</code>) — {created.path}
-            </div>
-          )}
       </Card>
-    </div>
+    </Box>
   );
 }
