@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Box, Button, Heading, Radio, RadioGroup, Stack, Text, Spinner, HStack, VStack, Card, CardBody } from "@chakra-ui/react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import { getPageTemplates } from "../utils/gqlQueries/getPageTemplates";
 import { parseRenderingsFromXml } from "../utils/lib/parseRenderingsFromXml";
@@ -52,6 +53,7 @@ export default function GetPageTemplates({
   const [selectedTemplateData, setSelectedTemplateData] =
     useState<ExtractedItem | null>(null);
   const [generateContent, setGenerateContent] = useState<boolean | null>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const makeGraphQLQuery = async () => {
     const sitecoreContextId = appContext?.resourceAccess?.[0]?.context?.preview;
@@ -60,6 +62,7 @@ export default function GetPageTemplates({
       console.error("❌ Sitecore Context ID not found.");
       return;
     }
+    setLoading(true);
     await client?.mutate("xmc.authoring.graphql", {
       params: {
         query: {
@@ -78,9 +81,11 @@ export default function GetPageTemplates({
           return { name, itemID, finalRenderings };
         });
         setExtractedData(extracted);
+        setLoading(false);
       },
       onError: (error: any) => {
         console.error("❌ GraphQL query failed:", error);
+        setLoading(false);
       },
     });
   };
@@ -93,6 +98,7 @@ export default function GetPageTemplates({
 
   useEffect(() => {
     makeGraphQLQuery();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (generateContent) {
@@ -109,34 +115,34 @@ export default function GetPageTemplates({
   }
 
   return (
-    <div className="p-4">
-      <button onClick={makeGraphQLQuery}> Make query </button>
-      {extractedData.length > 0 ? (
-        <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-2">Landing Pages ::</h3>
-          <div className="space-y-3">
+    <Box p={4} maxW="3xl" mx="auto">
+      <HStack justify="space-between" mb={4}>
+        <Heading as="h3" size="md">Landing Pages</Heading>
+        <Button size="sm" variant="outline" onClick={makeGraphQLQuery}>Refresh</Button>
+      </HStack>
+      {loading ? (
+        <HStack spacing={2}>
+          <Spinner size="sm" />
+          <Text>Loading templates...</Text>
+        </HStack>
+      ) : extractedData.length > 0 ? (
+        <RadioGroup value={selectedName ?? ""}>
+          <VStack align="stretch" spacing={3}>
             {extractedData.map((item) => (
-              <div
-                key={item.itemID}
-                className="flex items-center space-x-3 p-2 border rounded cursor-pointer hover:bg-gray-50"
-                onClick={() => handleRadioChange(item)}
-              >
-                <input
-                  type="radio"
-                  name="templateRadio"
-                  value={item.name}
-                  checked={selectedName === item.name}
-                  onChange={() => handleRadioChange(item)}
-                  className="cursor-pointer"
-                />
-                <span>{item.name}</span>
-              </div>
+              <Card key={item.itemID} size="sm" _hover={{ bg: "gray.50" }} cursor="pointer" onClick={() => handleRadioChange(item)}>
+                <CardBody py={2}>
+                  <HStack>
+                    <Radio value={item.name} onChange={() => handleRadioChange(item)} />
+                    <Text>{item.name}</Text>
+                  </HStack>
+                </CardBody>
+              </Card>
             ))}
-          </div>
-        </div>
+          </VStack>
+        </RadioGroup>
       ) : (
-        <p>Loading templates...</p>
+        <Text>No templates found.</Text>
       )}
-    </div>
+    </Box>
   );
 }
