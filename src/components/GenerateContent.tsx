@@ -4,12 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import GetMediaItems from "./GetMediaItems";
 
+
 import {
   getTemplateFields,
   resolveRendering,
   normalizeGuid,
   resolveTemplateId,
   createItemFromTemplate,
+  getBaseTemplatesByTemplateId,
+  getItemByPath,
+  getTemplateDefinitionByPath,
 } from "../utils/helper/cmsAuthoring";
 import type {
   TemplateFieldMeta,
@@ -19,6 +23,7 @@ import {
   parseRenderingsFromXml,
   RenderingFromXml,
 } from "../utils/lib/parseRenderingsFromXml";
+import { PutBlobResult } from "@vercel/blob";
 
 interface ExtractedItem {
   name: string;
@@ -82,11 +87,15 @@ export default function GenerateContent({
   client,
   selectedTemplateData,
   selectedFile,
+  prompt,
+  brandWebsite,
 }: {
   appContext: { resourceAccess?: Array<{ context?: { preview?: string } }> };
   client: ClientSDK | null;
   selectedTemplateData: ExtractedItem | null;
   selectedFile: any;
+  prompt: string | '';
+  brandWebsite: string | '';
 }) {
   const sitecoreContextId =
     appContext?.resourceAccess?.[0]?.context?.preview ?? "";
@@ -95,16 +104,18 @@ export default function GenerateContent({
   const [nameMap, setNameMap] = useState<Record<string, RenderingInfo>>({});
   const [namesReady, setNamesReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorAlert, setErrorAlert] = useState('');
-  
+  const [errorAlert, setErrorAlert] = useState("");
 
   const [activeRenderingId, setActiveRenderingId] = useState<string>("");
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
-  const [formValues, setFormValues] = useState<FormValues>({});
+  const [formValues, setFormValues] = useState<FormValues>({}); // Rendering form values
   const [dsTemplate, setDsTemplate] = useState<string>("");
   const [dsLocation, setDsLocation] = useState<string>("");
 
-  // Hard-coded parent (as you wanted)
+  // ✅ NEW: Base template fields के अलग values
+  const [baseFormValues, setBaseFormValues] = useState<FormValues>({}); // Base Page + _SEO values
+
+  // Hard-coded parent (as you wanted) — (datasource creation)
   const PARENT_ID = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
   const [newItemName, setNewItemName] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -115,8 +126,54 @@ export default function GenerateContent({
     path: string;
   }>(null);
 
-  // Parse XML & resolve ALL names; render chips only when all are ready
-  useEffect(() => {
+  // Base templates (debug)
+  const [baseTemplates, setBaseTemplates] = useState<
+    Array<{ name: string; fullName: string; templateId: string }>
+  >([]);
+
+  // getItemIdByPath result (debug)
+  const [pageBaseTemplateItem, setPageBaseTemplateItem] = useState<{
+    itemId: string;
+    name: string;
+    displayName?: string;
+    path: string;
+  } | null>(null);
+
+  // RAW template definition (debug)
+  const [pageTemplateDefinition, setPageTemplateDefinition] =
+    useState<any>(null);
+
+  // FINAL: extracted field/type pairs from Page + _Seo Metadata (deduped by fieldName)
+  const [pageFieldTypePairs, setPageFieldTypePairs] = useState<
+    { fieldName: string; fieldType: string }[]
+  >([]);
+
+  // ===================== Blog Page creation constants & state =====================
+  const BLOG_PARENT_ID = "{CFA8F31E-2335-47DF-8041-B8B8261D6A6A}";
+  const BLOG_TEMPLATE_ID = "43C1BC5D-831F-47F8-9D03-D3BA6602A0FD";
+
+  const [newPageName, setNewPageName] = useState<string>("");
+  const [creatingPage, setCreatingPage] = useState(false);
+  const [pageError, setPageError] = useState<string>("");
+  const [pageCreated, setPageCreated] = useState<null | {
+    itemId: string;
+    name: string;
+    path: string;
+  }>(null);
+
+  function pairsToMetas(
+    pairs: { fieldName: string; fieldType: string }[]
+  ): any {
+    return pairs.map((p) => ({
+      section: "BaseTemplate",
+      name: p.fieldName,
+      type: p.fieldType,
+    }));
+  }
+
+  // ===================== original logic (renderings resolve) =====================
+    // Parse XML & resolve ALL names for left renderings list
+    useEffect(() => {
     setRenderings([]);
     setNameMap({});
     setActiveRenderingId("");
@@ -159,7 +216,7 @@ export default function GenerateContent({
           const info = res.value;
           const xmlGuid = guids[i];
           map[normalizeGuid(info.itemId)] = info;
-          map[xmlGuid] = info; // index also by XML guid
+          map[xmlGuid] = info;
         }
       }
       setNameMap(map);
@@ -167,8 +224,126 @@ export default function GenerateContent({
     })();
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
-  // Click → load template fields from datasource template
-  const onClickRendering = async (componentIdRaw: string) => {
+  // helper: extract [{fieldName, fieldType}] from raw template tree
+  function extractFieldTypePairs(
+    raw: any
+  ): { fieldName: string; fieldType: string }[] {
+    const pairs: { fieldName: string; fieldType: string }[] = [];
+    try {
+      const sectionNodes = raw?.children?.nodes ?? [];
+      for (const section of sectionNodes) {
+        const fieldNodes = section?.children?.nodes ?? [];
+        for (const f of fieldNodes) {
+          const fieldName = f?.name ?? "";
+          const typeNode = f?.fields?.nodes?.find(
+            (n: any) => n?.name === "Type"
+          );
+          const fieldType = typeNode?.value ?? "";
+          if (fieldName && fieldType) {
+            pairs.push({ fieldName, fieldType });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[SCR3][GraphQL][TemplateDefinition][Extract][ERROR]", e);
+    }
+    return pairs;
+  }
+
+  // --- Chain calls: Base Templates -> Page -> _Seo Metadata -> merge & dedupe
+  useEffect(() => {
+    if (!client || !sitecoreContextId) return;
+
+    const BLOG_TEMPLATE_ID = "43C1BC5D-831F-47F8-9D03-D3BA6602A0FD";
+
+    (async () => {
+      try {
+        setPageFieldTypePairs([]);
+
+        const nodes = await getBaseTemplatesByTemplateId(
+          client!,
+          sitecoreContextId,
+          BLOG_TEMPLATE_ID
+        );
+        setBaseTemplates(nodes);
+
+        // 1) PAGE
+        const pageBase = nodes.find(
+          (n) => (n.name || "").toLowerCase() === "page"
+        );
+        if (pageBase) {
+          const pageItem = await getItemByPath(
+            client!,
+            sitecoreContextId,
+            pageBase.templateId
+          );
+          setPageBaseTemplateItem(pageItem);
+
+          if (pageItem?.path) {
+            const pageRaw = await getTemplateDefinitionByPath(
+              client!,
+              sitecoreContextId,
+              pageItem.path,
+              "en"
+            );
+            setPageTemplateDefinition(pageRaw);
+            const pagePairs = extractFieldTypePairs(pageRaw);
+            setPageFieldTypePairs(pagePairs);
+          }
+        } else {
+          console.log("[SCR3] Base template 'Page' not found.");
+        }
+
+        // 2) _SEO METADATA
+        const seoBase = nodes.find(
+          (n) => (n.name || "").toLowerCase() === "_seo metadata"
+        );
+        if (seoBase) {
+          const seoItem = await getItemByPath(
+            client!,
+            sitecoreContextId,
+            seoBase.templateId
+          );
+          if (seoItem?.path) {
+            const seoRaw = await getTemplateDefinitionByPath(
+              client!,
+              sitecoreContextId,
+              seoItem.path,
+              "en"
+            );
+            const seoPairs = extractFieldTypePairs(seoRaw);
+
+            // Merge & de-duplicate by fieldName
+            setPageFieldTypePairs((prev) => {
+              const all = [...prev, ...seoPairs];
+              const unique = all.reduce((acc, f) => {
+                if (!acc.some((x) => x.fieldName === f.fieldName)) acc.push(f);
+                return acc;
+              }, [] as { fieldName: string; fieldType: string }[]);
+              console.log(
+                "=== [SCR3][GraphQL][TemplateDefinition][Merged Page + _Seo Metadata][Unique] ==="
+              );
+              console.log(unique);
+              console.log(
+                "===================================================================="
+              );
+              return unique;
+            });
+          }
+        } else {
+          console.log("[SCR3] Base template '_Seo Metadata' not found.");
+        }
+      } catch (err: any) {
+        console.error(
+          "=== [SCR3][GraphQL][BaseTemplatesChain][ERROR] ===",
+          err?.message || err
+        );
+      }
+    })();
+  }, [client, sitecoreContextId]);
+
+  // Click → load template fields from datasource template (right panel)
+  const onClickRendering = async (componentIdRaw: string, compName: any) => {
     if (!client || !sitecoreContextId) return;
     const componentId = normalizeGuid(componentIdRaw);
 
@@ -199,36 +374,67 @@ export default function GenerateContent({
 
     if (!templateClean) return;
 
-    const tFields = await getTemplateFields(client, sitecoreContextId, templateClean);
-    console.log('_______________________tFields',tFields);
+    const tFields = await getTemplateFields(
+      client,
+      sitecoreContextId,
+      templateClean
+    );
+    console.log("_______________________tFields", tFields);
     let contentSummary = await generateContentSummary(tFields);
-    console.log('_______________________contentSummary after ',contentSummary.summary.result);
+    let currentTimeStamp = Date.now().toString().slice(-6);
+    let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
+    setNewItemName(compNameUnique);
 
-    setFields(contentSummary.summary.result);
+    console.log(
+      "_______________________contentSummary after 0 ",
+      contentSummary?.result
+    );
+    let contentSummary1 = contentSummary?.result?.map(
+      (item: { name: any; reference: any }) => {
+        item.name = item.reference;
+        return item;
+      }
+    );
+    console.log(
+      "_______________________contentSummary after ",
+      contentSummary1
+    );
+
+    setFields(contentSummary1);
 
     const init: FormValues = {};
     for (const f of tFields) init[f.name] = f.type === "Checkbox" ? false : "";
     setFormValues(init);
   };
 
-  const generateContentSummary = async (tFields:any) => {
-    //setLoading(true);
-    const formData = new FormData();
-    formData.append("tFields", JSON.stringify(tFields));
-    formData.append("model", "custom");
-    formData.append("pdf", selectedFile);
-
+  const generateContentSummary = async (tFields: any) => {
     try {
-      const res = await fetch("/api/generate-summary", {
+      setLoading(true);
+      const file = selectedFile;
+      const response = await fetch(
+        `/api/upload?filename=${file.name}`,
+        {
+          method: 'POST',
+          body: file,
+        },
+      );
+      const blob_url = (await response.json()) as PutBlobResult;
+      const uploadedFileName = blob_url.url;
+      console.log('............uploadedFileName',uploadedFileName);
+
+      // 2️⃣ Send to third-party API
+      const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadedFileName, tFields, prompt, brandWebsite }),
       });
 
-      if (res?.status == 200) {
-        const data = await res.json();
-        console.log('_________________generateContentSummary', data);
-        return data;
-        //setResult(data);
+      if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
+
+      const data = await thirdPartyRes.json();
+
+      if (thirdPartyRes?.status == 200) {
+        return data?.data;
       } else {
         setErrorAlert(
           "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
@@ -237,8 +443,6 @@ export default function GenerateContent({
         return [];
       }
     } catch (err) {
-      //setCancel();
-      //setFirstPage(true);
       setErrorAlert(
         "We're currently experiencing heavy traffic. Please try again in 5 to 15 minutes."
       );
@@ -258,7 +462,7 @@ export default function GenerateContent({
   }, [fields]);
 
   const renderInput = (f: TemplateFieldMeta) => {
-    console.log('fields values',f);
+    console.log("fields values", f);
     const k = f.name;
     const v = formValues[k];
     const set = (nv: string | boolean) =>
@@ -269,6 +473,7 @@ export default function GenerateContent({
         return (
           <label className="inline-flex items-center gap-2">
             <input
+              name={f.name}
               type="checkbox"
               className="size-4"
               checked={Boolean(v)}
@@ -281,9 +486,10 @@ export default function GenerateContent({
       case "Multi-Line Text":
         return (
           <textarea
+            name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={4}
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -291,37 +497,41 @@ export default function GenerateContent({
       case "Number":
         return (
           <input
+            name={f.name}
             type="number"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
       case "Date":
         return (
           <input
+            name={f.name}
             type="date"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
       case "Datetime":
         return (
           <input
+            name={f.name}
             type="datetime-local"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
       case "General Link":
         return (
           <input
+            name={f.name}
             type="url"
             placeholder="https://… or internal link"
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
@@ -330,37 +540,52 @@ export default function GenerateContent({
       case "Treelist":
         return (
           <textarea
+            name={f.name}
             className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
             rows={2}
             placeholder="IDs/paths comma- or newline-separated"
-            value={String(v ?? "")}
+            value={f.value || ""}
             onChange={(e) => set(e.target.value)}
           />
         );
       case "Droplink":
       case "Droptree":
       case "Image":
-      case "File":
         return (
-          <>
-            <input
-        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 hidden"
-        placeholder={f.source ? `source: ${f.source}` : ""}
-        value={String(v ?? "")}
-        onChange={(e) => set(e.target.value)}
-      />
-
-      <GetMediaItems
+           <>
+          <input
+            name={f.name}
+            type="file"
+            style={{ display: "none" }}
+            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            onChange={(e) => set(e.target.value)}
+          />
+          <GetMediaItems
         appContext={appContext}
         client={client}
          onMediaSelect={(media) => {setFormValues((prev) => ({...prev,[f.name]: media.id, }));}}
       />
           </>
         );
+      case "File":
+        return (
+          <>
+            <input
+             name={f.name}
+        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 "
+        placeholder={f.source ? `source: ${f.source}` : ""}
+        value={String(v ?? "")}
+        onChange={(e) => set(e.target.value)}
+      />
+
+      
+          </>
+        );
       default:
         return (
           <input
-            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dynamic-input"
+            name={f.name}
             value={f.value}
             onChange={(e) => set(e.target.value)}
           />
@@ -370,6 +595,7 @@ export default function GenerateContent({
 
   /** Convert current form to simple [{name, value}] list for mutation */
   function toCreateFields(values: FormValues, metas: TemplateFieldMeta[]) {
+    console.log("__________toCreateFields______", values, metas);
     const list: { name: string; value: string }[] = [];
     for (const m of metas) {
 
@@ -380,7 +606,7 @@ export default function GenerateContent({
       let value = "";
       switch (m.type) {
         case "Checkbox":
-          value = (raw ? "1" : "0") as string; // Sitecore accepts 1/0 for checkbox
+          value = (raw ? "1" : "0") as string;
           break;
         case "Image":        
           value = `<image mediaid="${raw}" />`;
@@ -419,15 +645,57 @@ export default function GenerateContent({
         sitecoreContextId,
         dsTemplate
       );
-
-      // Build fields payload from form
       const fieldsPayload = toCreateFields(formValues, fields);
 
-      // Create the item (fields are inlined inside the mutation)
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
         parentId: PARENT_ID,
-        templateId,
+        templateId:templateId,
+        fields: fieldsPayload,
+      });
+
+      setCreated({ itemId: item.itemId, name: item.name, path: item.path });
+    } catch (e: any) {
+      setSaveError(e?.message || "Failed to create datasource item.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // === Create Blog Page (uses BASE form values only)
+  const onCreateBlogPage = async () => {
+    setPageError("");
+    setPageCreated(null);
+
+    if (!client || !sitecoreContextId) {
+      setPageError("Client/context unavailable.");
+      return;
+    }
+    if (!newPageName.trim()) {
+      setPageError("Please enter a page name.");
+      return;
+    }
+
+    try {
+      setCreatingPage(true);
+
+      const pageMetas = pairsToMetas(pageFieldTypePairs);
+      const fieldsPayload = toCreateFields(baseFormValues, pageMetas);
+
+      // Create the item (fields are inlined inside the mutation)
+      let parentId = PARENT_ID;
+      if (selectedInfo?.name?.toLowerCase().includes("carousel")) {
+        parentId = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
+      } else if (selectedInfo?.name?.toLowerCase().includes("promo")) {
+        parentId = "{8E44568A-E881-4CD9-A44F-399049DCF198}";
+      } else if (selectedInfo?.name?.toLowerCase().includes("image")) {
+        parentId = "{E812C7E5-8C9C-4848-A36A-B1FFB5B94387}";
+      }
+
+      const item = await createItemFromTemplate(client, sitecoreContextId, {
+        name: newItemName.trim(),
+        parentId:parentId,
+        templateId:dsTemplate,
         fields: fieldsPayload,
       });
 
@@ -455,8 +723,43 @@ export default function GenerateContent({
         }
       />
 
+      {/* 2) Base Template Fields (right under the header card) */}
+      {pageFieldTypePairs.length > 0 && (
+        <Card
+          title="Base Template Fields"
+          subtitle="Auto-generated from Page and _Seo Metadata templates"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
+              const meta: TemplateFieldMeta = {
+                section: "BaseTemplate",
+                name: fieldName,
+                type: fieldType,
+                value: undefined,
+              };
+              return (
+                <label
+                  key={`BaseTemplate/${fieldName}-${index}`}
+                  className="block"
+                >
+                  <div className="text-xs mb-1">
+                    <span className="font-semibold">{fieldName}</span>{" "}
+                    <span className="text-gray-500">({fieldType})</span>
+                  </div>
+                  {renderInput(meta)}
+                </label>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* 3) Renderings UI */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="Renderings" subtitle="Click a rendering to load its fields">
+        <Card
+          title="Renderings"
+          subtitle="Click a rendering to load its fields"
+        >
           {!namesReady ? (
             <div className="space-y-2">
               <div className="h-7 w-28 rounded-full bg-gray-200 animate-pulse" />
@@ -498,7 +801,7 @@ export default function GenerateContent({
                         label={info.name}
                         title={tooltip}
                         active={activeRenderingId === guid}
-                        onClick={() => onClickRendering(guid)}
+                        onClick={() => onClickRendering(guid, info.name)}
                       />
                     </li>
                   );
@@ -605,6 +908,45 @@ export default function GenerateContent({
           )}
         </div>
       </div>
+
+      {/* === BOTTOM: Create Blog Page === */}
+      <Card
+        title="Create Blog Page"
+        subtitle="Create a new blog page under ‘All Blogs’"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1">Page Name</label>
+            <input
+              className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              value={newPageName}
+              onChange={(e) => setNewPageName(e.target.value)}
+              placeholder="e.g., Blog4"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Parent: All Blogs ({BLOG_PARENT_ID}) • Template: Blog ({BLOG_TEMPLATE_ID})
+            </div>
+          </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={onCreateBlogPage}
+              disabled={creatingPage}
+              className="px-4 py-2 rounded-lg border bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-60"
+            >
+              {creatingPage ? "Creating…" : "Create Page"}
+            </button>
+          </div>
+        </div>
+
+        {pageError && <div className="text-sm text-red-600 mt-2">{pageError}</div>}
+        {pageCreated && (
+          <div className="text-sm text-green-700 mt-2">
+            Created: <strong>{pageCreated.name}</strong> (
+            <code>{pageCreated.itemId}</code>) — {pageCreated.path}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

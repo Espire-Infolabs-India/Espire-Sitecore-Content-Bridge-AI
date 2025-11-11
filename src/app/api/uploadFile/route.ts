@@ -4,6 +4,56 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
+    
+
+
+    const formData = await req.formData();
+
+    const file = formData.get('file') as File;
+    const presignedUploadUrl = formData.get('presignedUploadUrl') as string;
+    const fileData = formData.get('fileData') as string;
+    const token = formData.get('token') as string;
+
+     
+
+
+    const buffer = Buffer.from(fileData, "base64");
+
+
+    // ✅ Create multipart/form-data
+    const uploadForm = new FormData();
+    uploadForm.set("image", file); // 👈 must use 'image' field name
+
+    // ✅ Upload to Sitecore Authoring API
+    const uploadResponse = await fetch(presignedUploadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        'Authorization': `Bearer ${token}`, // if your presigned URL requires it
+      },
+       body: uploadForm, // 👈 do NOT set Content-Type manually
+      //body: fileData,
+    });
+
+    const uploadRes = await uploadResponse;
+
+    console.log( {uploadItem: uploadRes});
+
+    if (!uploadResponse.ok) {
+      console.error("Upload failed:", uploadRes);
+      return NextResponse.json({ error: "Upload failed", details: uploadRes }, { status: uploadResponse.status });
+    }
+    return NextResponse.json({ success: true, response: uploadRes }); 
+  } catch (err: any) {
+    console.error('Unexpected error in uploadFile route:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+
+
+
+
     // const { fileName, fileData, presignedUploadUrl, token } = await req.json();
 
     // if (!fileData || !presignedUploadUrl) {
@@ -22,48 +72,19 @@ export async function POST(req: NextRequest) {
 
     // Send file to Sitecore presigned URL
 
+    
+    /*
 
 
-    const formData = await req.formData();
-
-    const file = formData.get('file') as File;
-    const presignedUploadUrl = formData.get('presignedUploadUrl') as string;
-    const token = formData.get('token') as string;
 
     const arrayBuffer = await file.arrayBuffer();
 
-    const uploadResponse = await fetch(presignedUploadUrl, {
+      const uploadResponse = await fetch(presignedUploadUrl, {
       method: 'POST', // presigned URLs usually expect PUT
       headers: {
-        'Content-Type': file.type,
+        "Content-Type": file.type || "application/octet-stream",
         'Authorization': `Bearer ${token}`, // if your presigned URL requires it
       },
       body: arrayBuffer,
     });
-
-
-    
-    // const uploadResponse = await fetch(presignedUploadUrl, {
-    //   method: 'POST', // ✅ Sitecore presigned expects POST
-    //   headers: {
-    //     authorization: `Bearer ${token}`, // ✅ only if Sitecore requires it
-    //   },
-    //   body: formData, // ✅ send as multipart/form-data
-    // });
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('Upload failed:', errorText);
-      return NextResponse.json(
-        { error: 'Upload failed', details: errorText },
-        { status: 500 }
-      );
-    }
-
-    console.log('✅ File uploaded successfully:', uploadResponse);
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error('Unexpected error in uploadFile route:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
-}
+    */
