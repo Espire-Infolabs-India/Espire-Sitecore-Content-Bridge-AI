@@ -630,22 +630,15 @@ export default function GenerateContent({
       case "Droptree":
       case "Image":
         return (
-          <>
-            <input
-              name={f.name}
-              type="file"
-              style={{ display: "none" }}
-              className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              onChange={(e) => set(e.target.value)}
-            />
-            <GetMediaItems
-              appContext={appContext}
-              client={client}
-              onMediaSelect={(media) => {
-                setFormValues((prev) => ({ ...prev, [f.name]: media.id }));
-              }}
-            />
-          </>
+          <div onClick={(e) => e.stopPropagation()}>
+      <GetMediaItems
+        appContext={appContext}
+        client={client}
+        onMediaSelect={(media) => {
+          setFormValues((prev) => ({ ...prev, [f.name]: media.id }));
+        }}
+      />
+    </div>
         );
       case "File":
         return (
@@ -1053,7 +1046,19 @@ export default function GenerateContent({
                   <Box key={section || 'default'} mb={5}>
                     <Text fontSize="sm" fontWeight="medium" color="gray.700" mb={2}>{section || 'Fields'}</Text>
                     <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={4}>
-                      {items.map((f, i) => (
+                    {items.map((f, i) => (
+                      f.type === "Image" ? (
+                        <Box key={`${section}/${i}`} display="block">
+                          <Box fontSize="xs" mb={1}>
+                            <Text as="span" fontWeight="semibold">{f.name}</Text>{' '}
+                            <Text as="span" color="gray.500">({f.type || 'Text'})</Text>
+                            {f.source ? (
+                              <Text as="span" color="gray.400">{` — ${f.source}`}</Text>
+                            ) : null}
+                          </Box>
+                          {renderInput(f)}
+                        </Box>
+                      ) : (
                         <Box as="label" key={`${section}/${i}`} display="block">
                           <Box fontSize="xs" mb={1}>
                             <Text as="span" fontWeight="semibold">{f.name}</Text>{' '}
@@ -1062,14 +1067,11 @@ export default function GenerateContent({
                               <Text as="span" color="gray.400">{` — ${f.source}`}</Text>
                             ) : null}
                           </Box>
-                          {f.longDescription || f.shortDescription ? (
-                            <Text fontSize="xs" color="gray.600" mb={2} lineHeight="short">
-                              Help Text: {f.longDescription || f.shortDescription}
-                            </Text>
-                          ) : null}
                           {renderInput(f)}
                         </Box>
-                      ))}
+                      )
+                    ))}
+
                     </Box>
                   </Box>
                 ))}
