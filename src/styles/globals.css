@@ -186,3 +186,8 @@ pre {
     font-size: 14px;
     cursor: pointer;
 }
+
+.modal-button-open{
+  margin: 0 auto;
+  
+}

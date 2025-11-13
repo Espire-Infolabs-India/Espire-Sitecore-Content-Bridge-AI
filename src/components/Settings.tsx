@@ -1,4 +1,6 @@
+"use client";
 import { useState } from "react";
+import { Button, IconButton, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, FormControl, FormLabel, Textarea, Stack, Box } from "@chakra-ui/react";
 
 interface SettingsProps {
   prompt: string;
@@ -10,41 +12,32 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({prompt, brandWebsite, setPromptValue, setBrandWebsite }) => {
   const [isModalOpen, setModalOpen] = useState(false);
   return (
-    <div>
-      <div className="flex justify-end gap-2">
-        <button
-          className="primary-button"
-          onClick={() => setModalOpen(true)}
-        >
-          Settings
-        </button>
-      </div>
+    <Box textAlign="right">
+      <Button colorScheme="gray" onClick={() => setModalOpen(true)}>Settings</Button>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center modal-body">
-          <div className="bg-white p-6 rounded-lg w-[500px]">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-black">Settings</h2>
-              <button onClick={() => setModalOpen(false)}>X</button>
-            </div>
-
-            <div className="mb-4 ">
-              <textarea placeholder="Enter a prompt" value={prompt} onChange={setPromptValue}></textarea>
-              <textarea placeholder="Enter a Brand Website" value={brandWebsite} onChange={setBrandWebsite}></textarea>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="primary-button"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} isCentered>
+        <ModalOverlay />
+        <ModalContent maxW="md">
+          <ModalHeader>Settings</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Stack spacing={4}>
+              <FormControl>
+                <FormLabel>Prompt</FormLabel>
+                <Textarea placeholder="Enter a prompt" value={prompt} onChange={setPromptValue} rows={4} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Brand Website</FormLabel>
+                <Textarea placeholder="Enter a Brand Website" value={brandWebsite} onChange={setBrandWebsite} rows={4} />
+              </FormControl>
+            </Stack>
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={() => setModalOpen(false)} colorScheme="blue">Close</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </Box>
   );
 };
 
