@@ -142,14 +142,7 @@ export default function GetPageTemplates({
         </RadioGroup>
       ) : (
         <Text>No templates found.</Text>
-      )}
-
-       <GetMediaItems
-              appContext={appContext}
-              client={client}
-               
-              //onMediaSelect={(media) => console.log("Selected Media:", media)}
-            />
+      )} 
     </Box>
     
   );

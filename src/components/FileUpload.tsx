@@ -132,6 +132,7 @@ console.log("Item Path:", itemPath);
   };
 
   return (
+    /*
     <div style={{ marginTop: '10px' }}>
       <input type="file" onChange={handleFileChange} />
       <button
@@ -143,6 +144,38 @@ console.log("Item Path:", itemPath);
       </button>
       {message && <p>{message}</p>}
     </div>
+*/
+
+<div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
+  {/* File Input */}
+  <label className="flex flex-col sm:flex-row items-center justify-center w-full sm:w-auto cursor-pointer border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-lg px-4 py-2 transition-all duration-200">
+    <span className="text-sm text-gray-600">
+      {file ? file.name : "Choose file"}
+    </span>
+    <input type="file" onChange={handleFileChange} className="hidden" />
+  </label>
+
+  {/* Upload Button */}
+  <button
+    onClick={handleUpload}
+    disabled={uploading || !file}
+    className={`px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all duration-200 ${
+      uploading || !file
+        ? "bg-gray-400 cursor-not-allowed"
+        : "bg-blue-600 hover:bg-blue-700"
+    }`}
+  >
+    {uploading ? "Uploading..." : "Upload"}
+  </button>
+
+  {/* Status Message */}
+  {message && (
+    <p className="text-sm text-gray-700 mt-2 sm:mt-0 sm:ml-2 italic">
+      {message}
+    </p>
+  )}
+</div>
+
   );
 };
 

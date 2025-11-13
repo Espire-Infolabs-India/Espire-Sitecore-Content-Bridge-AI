@@ -83,17 +83,19 @@ export default function GetMediaItems({
   }, [currentPath]);
 
   return (
-    <div className="p-4">
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-      >
-        Select Media
-      </button>
+    <div className="p-6 bg-white shadow-md rounded-2xl max-w-lg mx-auto space-y-4">
+      <p className="text-lg font-semibold text-gray-800">Image</p>
 
-      <FileUpload appContext={appContext}
-            targetPath=''
-              client={client}/>
+{/* Select Media Button */}
+<button
+  onClick={() => setIsModalOpen(true)}
+  className="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition duration-200"
+>
+  Select Media
+</button>
+
+{/* File Upload Section */}
+<FileUpload appContext={appContext} targetPath="" client={client} />
 
       {selectedMedia && (
         <div className="mt-4 flex items-center space-x-3">
