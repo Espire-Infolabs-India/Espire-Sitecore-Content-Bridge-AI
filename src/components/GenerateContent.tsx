@@ -747,9 +747,19 @@ export default function GenerateContent({
       );
       const fieldsPayload = toCreateFields(formValues, fields);
 
+       // Create the item (fields are inlined inside the mutation)
+      let parentId = PARENT_ID;
+      if (selectedInfo?.name?.toLowerCase().includes("carousel")) {
+        parentId = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
+      } else if (selectedInfo?.name?.toLowerCase().includes("promo")) {
+        parentId = "{8E44568A-E881-4CD9-A44F-399049DCF198}";
+      } else if (selectedInfo?.name?.toLowerCase().includes("image")) {
+        parentId = "{E812C7E5-8C9C-4848-A36A-B1FFB5B94387}";
+      }
+
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
-        parentId: PARENT_ID,
+        parentId: parentId,
         templateId: templateId,
         fields: fieldsPayload,
       });
