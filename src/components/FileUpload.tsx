@@ -91,15 +91,10 @@ console.log("Item Path:", itemPath);
             console.error("❌ No presigned upload URL returned");
             return;
           }
-          
-          console.log("Expires?", presignedUploadUrl.includes("Expires"));
-
-
+          /* Token */
           const tokenResponse = await fetch('/api/getToken');
           const tokenJson = await tokenResponse.json();
-          const token = tokenJson.access_token;
-
-          console.log("Token:", token);
+          const token = tokenJson.access_token; 
 
 
           const formData = new FormData();
@@ -110,7 +105,7 @@ console.log("Item Path:", itemPath);
           
           const result = await fetch('/api/uploadFile', {
             method: 'POST',
-            body: formData, // do NOT set Content-Type manually — browser sets it for multipart/form-data
+            body: formData,  
           });
 
           console.log("Upload Result:", result);
@@ -132,19 +127,7 @@ console.log("Item Path:", itemPath);
   };
 
   return (
-    /*
-    <div style={{ marginTop: '10px' }}>
-      <input type="file" onChange={handleFileChange} />
-      <button
-        onClick={handleUpload}
-        disabled={uploading || !file}
-        className="ml-2 px-3 py-1 bg-blue-600 text-white rounded"
-      >
-        {uploading ? 'Uploading...' : 'Upload'}
-      </button>
-      {message && <p>{message}</p>}
-    </div>
-*/
+     
 
 <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
   {/* File Input */}
@@ -178,100 +161,3 @@ console.log("Item Path:", itemPath);
 
   );
 };
-
-
-
-
-/*
-    // ✅ Get token from backend
-    const tokenResponse = await fetch('/api/getToken');
-    const tokenJson = await tokenResponse.json();
-    const token = tokenJson.access_token;
-
-    console.log("Token:", token);
- */
-
-/*
-
-          // Convert File to base64
-          const fileData = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              if (!reader.result) return reject("File read failed");
-              resolve((reader.result as string).split(',')[1]); // remove prefix
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          */
-
-
-// Send to server
-// const result = await fetch('/api/uploadFile', {
-//   method: 'POST',
-//   headers: { 'Content-Type': 'application/json' },
-//   body: JSON.stringify({
-//     fileName: file.name,
-//     fileData,
-//     presignedUploadUrl, // from GraphQL mutation
-//     token
-//   }),
-// });
-
-
-/*
-// --- Step 2: Upload the file directly to S3 ---
-const uploadResponse = await fetch(presignedUploadUrl, {
-method: "PUT",
-headers: {
-"Content-Type": file.type || "application/octet-stream",
-},
-body: file,
-});
-
-if (!uploadResponse.ok) {
-throw new Error(`Upload failed: ${uploadResponse.statusText}`);
-}
-*/
-
-
-
-// Get presigned upload URL
-
-
-/*
-const formData = new FormData(); 
-formData.append('cleanFileName', cleanFileName);
-formData.append('token', token);
-
- 
-
-
-const result = await fetch('/api/uploadMedia', {
-  method: 'POST',
-  body: formData, // do NOT set Content-Type manually — browser sets it for multipart/form-data
-});
-console.log("Authoring Response:", result);
-*/
-
-/*
-const input = {
-        itemPath: `Default Website`,
-        alt: cleanFileName,
-        language: "en",
-        overwriteExisting: true,
-        includeExtensionInItemName: false,
-        database: "master",
-        versioned: false
-      };
-
-      console.log("GraphQL Input:", input);
-
-      const mutation = `
-        mutation UploadMedia($input: UploadMediaInput!) {
-          uploadMedia(input: $input) {
-            presignedUploadUrl
-          }
-        }
-      `;
-*/
