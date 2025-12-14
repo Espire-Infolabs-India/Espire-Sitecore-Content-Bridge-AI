@@ -3,7 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import GetMediaItems from "./GetMediaItems";
-import { Box, Button, Heading, Text, Stack, Spinner, Alert, AlertIcon, AlertDescription } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Heading,
+  Text,
+  Stack,
+  Spinner,
+  Alert,
+  AlertIcon,
+  AlertDescription,
+} from "@chakra-ui/react";
 
 import {
   getTemplateFields,
@@ -26,6 +36,9 @@ import {
   RenderingFromXml,
 } from "../utils/lib/parseRenderingsFromXml";
 
+type RenderingFromXmlWithDs = RenderingFromXml & {
+  datasource?: string;
+};
 
 interface ExtractedItem {
   name: string;
@@ -70,11 +83,22 @@ function Card({
   children?: React.ReactNode;
 }) {
   return (
-    <Box borderWidth="1px" borderRadius="2xl" p={4} mb="10" bg="white" shadow="sm">
+    <Box
+      borderWidth="1px"
+      borderRadius="2xl"
+      p={4}
+      mb="10"
+      bg="white"
+      shadow="sm"
+    >
       <Box mb={3}>
-        <Heading as="div" size="sm">{title}</Heading>
+        <Heading as="div" size="sm">
+          {title}
+        </Heading>
         {subtitle ? (
-          <Text fontSize="xs" color="gray.500" mt={0.5}>{subtitle}</Text>
+          <Text fontSize="xs" color="gray.500" mt={0.5}>
+            {subtitle}
+          </Text>
         ) : null}
       </Box>
       {children}
@@ -97,9 +121,37 @@ export default function GenerateContent({
   prompt: string | "";
   brandWebsite: string | "";
 }) {
-  const sitecoreContextId = appContext?.resourceAccess?.[0]?.context?.preview ?? "";
+  const sitecoreContextId =
+    appContext?.resourceAccess?.[0]?.context?.preview ?? "";
 
-  const [renderings, setRenderings] = useState<RenderingFromXml[]>([]);
+  // DEBUG: See what page template and rendering XML we actually receive
+  useEffect(() => {
+    console.log("====== DEBUG: Template Selection Change ======");
+    console.log("[SCR3][RenderingsInit][Template]", selectedTemplateData);
+
+    if (!selectedTemplateData) {
+      console.log("[SCR3][RenderingsInit] No template selected");
+      return;
+    }
+
+    console.log(
+      "[SCR3][RenderingsInit][FinalRenderingsXml]",
+      selectedTemplateData.finalRenderings
+    );
+
+    try {
+      const parsedList = parseRenderingsFromXml(
+        selectedTemplateData.finalRenderings || ""
+      );
+      console.log("[SCR3][RenderingsInit][ParsedList]", parsedList);
+    } catch (err) {
+      console.error("[SCR3][RenderingsInit][XML Parse ERROR]", err);
+    }
+
+    console.log("=============================================");
+  }, [selectedTemplateData]);
+
+  const [renderings, setRenderings] = useState<RenderingFromXmlWithDs[]>([]);
   const [nameMap, setNameMap] = useState<Record<string, RenderingInfo>>({});
   const [namesReady, setNamesReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -110,7 +162,7 @@ export default function GenerateContent({
   const [formValues, setFormValues] = useState<FormValues>({}); // Rendering form values
   const [dsTemplate, setDsTemplate] = useState<string>("");
   //const [templateDetails, setTemplateDetails = useState<any>();
-  const [dsLocation, setDsLocation] = useState<string>(""); 
+  const [dsLocation, setDsLocation] = useState<string>("");
 
   // Base template values
   const [baseFormValues, setBaseFormValues] = useState<FormValues>({}); // Base Page + _SEO values
@@ -148,8 +200,23 @@ export default function GenerateContent({
   // FINAL: extracted field/type pairs from Page + _Seo Metadata (deduped by fieldName)
 
   const [pageFieldTypePairs, setPageFieldTypePairs] = useState<
-    { fieldName: string; fieldType: string, value: any }[]
+    { fieldName: string; fieldType: string; value: any }[]
   >([]);
+
+  // ===================== Template → Parent mapping (config) =====================
+
+  const TEMPLATE_PARENT_MAP: Record<string, string> = {
+    // Blog template → All Blogs folder (existing behaviour)
+    "43C1BC5D831F47F89D03D3BA6602A0FD":
+      "{CFA8F31E-2335-47DF-8041-B8B8261D6A6A}",
+
+    // Banner template → All Banners folder
+    "66E157CC05464A748B739E7A9B412BD3":
+      "{C2138C06-DBA0-45BF-B4B6-85B103A66CD1}",
+
+    // Page (Content) template → All Pages folder
+    E33FE32537BC4F61AECC0C69EA8F92B0: "{B4BDB665-1828-44AE-9901-419F05F24D3A}",
+  };
 
   // ===================== Blog Page creation constants & state =====================
   const BLOG_PARENT_ID = "{CFA8F31E-2335-47DF-8041-B8B8261D6A6A}";
@@ -181,67 +248,141 @@ export default function GenerateContent({
   }
 
   // ===================== original logic (renderings resolve) =====================
-    // Parse XML & resolve ALL names for left renderings list
-    useEffect(() => {
-      //setTemplateDetails(selectedTemplateData);
-      setIsPageLoading(true);
-      setRenderings([]);
-      setNameMap({});
-      setActiveRenderingId("");
-      setFields([]);
-      setFormValues({});
-      setDsTemplate("");
-      setDsLocation("");
-      setNamesReady(false);
+  // Parse XML & resolve ALL names for left renderings list
+  useEffect(() => {
+    //setTemplateDetails(selectedTemplateData);
+    setIsPageLoading(true);
+    setRenderings([]);
+    setNameMap({});
+    setActiveRenderingId("");
+    setFields([]);
+    setFormValues({});
+    setDsTemplate("");
+    setDsLocation("");
+    setNamesReady(false);
 
-      if (
-        !client ||
-        !sitecoreContextId ||
-        !selectedTemplateData?.finalRenderings
-      ) {
-        setNamesReady(true);
-        return;
+    // Clear any old datasource assignments when template/layout changes
+    setRenderingDatasourceObject(null);
+    setRenderingDatasourceObjects([]);
+
+    if (
+      !client ||
+      !sitecoreContextId ||
+      !selectedTemplateData?.finalRenderings
+    ) {
+      setNamesReady(true);
+      return;
+    }
+
+    // ===================== [SCR3][RenderingsInit] – start =====================
+    const finalXml = selectedTemplateData.finalRenderings || "";
+
+    console.log("[SCR3][RenderingsInit][Template]", {
+      selectedTemplateName: selectedTemplateData?.name,
+      selectedTemplateId: selectedTemplateData?.itemID,
+    });
+
+    console.log(
+      "[SCR3][RenderingsInit][FinalRenderingsXml]",
+      finalXml || "(EMPTY XML)"
+    );
+
+    const DEVICE_HEADLESS_LAYOUT =
+      "{FE5D7FDF-89C0-4D99-9AA3-B5FBD009C9F3}".toLowerCase();
+
+    let list: RenderingFromXml[] = [];
+
+    if (finalXml) {
+      try {
+        const dom = new DOMParser().parseFromString(finalXml, "text/xml");
+
+        // find correct <d> node (Headless Layout device); fall back to first <d>
+        const deviceNodes = Array.from(dom.getElementsByTagName("d"));
+        const headlessDevice =
+          deviceNodes.find(
+            (d) =>
+              (d.getAttribute("id") || "").toLowerCase() ===
+              DEVICE_HEADLESS_LAYOUT
+          ) || deviceNodes[0];
+
+        if (!headlessDevice) {
+          console.warn(
+            "[SCR3][RenderingsInit][WARN] No <d> device node found in XML."
+          );
+        } else {
+          const rNodes = Array.from(headlessDevice.getElementsByTagName("r"));
+
+          list = rNodes
+            .map((r): RenderingFromXmlWithDs => {
+              const componentId =
+                r.getAttribute("s:id") || r.getAttribute("id") || "";
+              const placeholder =
+                r.getAttribute("s:ph") || r.getAttribute("ph") || "";
+              const uid = r.getAttribute("uid") || "";
+              const datasource =
+                r.getAttribute("s:ds") || r.getAttribute("ds") || undefined;
+
+              return {
+                uid,
+                componentId,
+                placeholder,
+                datasource,
+              };
+            })
+            .filter((r) => !!r.componentId); // drop empty rows
+        }
+
+        console.log("[SCR3][RenderingsInit][ParsedList]", list);
+      } catch (err) {
+        console.error("[SCR3][RenderingsInit][ParseError]", err);
       }
+    } else {
+      console.warn(
+        "[SCR3][RenderingsInit][WARN] selectedTemplateData.finalRenderings is EMPTY."
+      );
+    }
 
-      const list = parseRenderingsFromXml(selectedTemplateData.finalRenderings);
-      setRenderings(list);
+    setRenderings(list);
+    // ===================== [SCR3][RenderingsInit] – end =====================
 
-      if (list.length === 0) {
-        setNamesReady(true);
-        setIsPageLoading(false);
-        return;
-      }
+    // setRenderings(list);
 
-      const guids = Array.from(
-        new Set(list.map((r) => normalizeGuid(r.componentId)))
+    if (list.length === 0) {
+      setNamesReady(true);
+      setIsPageLoading(false);
+      return;
+    }
+
+    const guids = Array.from(
+      new Set(list.map((r) => normalizeGuid(r.componentId)))
+    );
+
+    (async () => {
+      const results = await Promise.allSettled(
+        guids.map((g) => resolveRendering(client, sitecoreContextId, g))
       );
 
-      (async () => {
-        const results = await Promise.allSettled(
-          guids.map((g) => resolveRendering(client, sitecoreContextId, g))
-        );
-
-        const map: Record<string, RenderingInfo> = {};
-        for (let i = 0; i < results.length; i++) {
-          const res = results[i];
-          if (res.status === "fulfilled") {
-            const info = res.value;
-            const xmlGuid = guids[i];
-            map[normalizeGuid(info.itemId)] = info;
-            map[xmlGuid] = info;
-          }
+      const map: Record<string, RenderingInfo> = {};
+      for (let i = 0; i < results.length; i++) {
+        const res = results[i];
+        if (res.status === "fulfilled") {
+          const info = res.value;
+          const xmlGuid = guids[i];
+          map[normalizeGuid(info.itemId)] = info;
+          map[xmlGuid] = info;
         }
-        setNameMap(map);
-        setNamesReady(true);
-        //setIsPageLoading(false);
-      })();
+      }
+      setNameMap(map);
+      setNamesReady(true);
+      //setIsPageLoading(false);
+    })();
   }, [client, sitecoreContextId, selectedTemplateData?.finalRenderings]);
 
   // helper: extract [{fieldName, fieldType}] from raw template tree
   function extractFieldTypePairs(
     raw: any
-  ): { fieldName: string; fieldType: string, value: string }[] {
-    const pairs: { fieldName: string; fieldType: string, value:string }[] = [];
+  ): { fieldName: string; fieldType: string; value: string }[] {
+    const pairs: { fieldName: string; fieldType: string; value: string }[] = [];
     try {
       const sectionNodes = raw?.children?.nodes ?? [];
       for (const section of sectionNodes) {
@@ -266,19 +407,19 @@ export default function GenerateContent({
 
   // --- Chain calls: Base Templates -> Page -> _Seo Metadata -> merge & dedupe
   useEffect(() => {
-    if (!client || !sitecoreContextId) return;
+    if (!client || !sitecoreContextId || !selectedTemplateData?.itemID) return;
 
-    const BLOG_TEMPLATE_ID = "43C1BC5D-831F-47F8-9D03-D3BA6602A0FD";
+    // Use the currently selected template instead of hard-coded Blog
+    const selectedTemplateId = selectedTemplateData.itemID.replace(/[{}]/g, "");
 
     (async () => {
       try {
         setPageFieldTypePairs([]);
-        var pagePairs;
 
         const nodes = await getBaseTemplatesByTemplateId(
           client!,
           sitecoreContextId,
-          BLOG_TEMPLATE_ID
+          selectedTemplateId
         );
         setBaseTemplates(nodes);
 
@@ -286,6 +427,26 @@ export default function GenerateContent({
         const pageBase = nodes.find(
           (n) => (n.name || "").toLowerCase() === "page"
         );
+        const seoBase = nodes.find(
+          (n) => (n.name || "").toLowerCase() === "_seo metadata"
+        );
+
+        if (!pageBase || !seoBase) {
+          console.log(
+            "[SCR3] Skipping base-field AI for template",
+            selectedTemplateData?.name,
+            {
+              hasPageBase: !!pageBase,
+              hasSeoBase: !!seoBase,
+            }
+          );
+          setIsBaseFormLoader(false);
+          setIsPageLoading(false);
+          return;
+        }
+
+        // 1) PAGE (we already have pageBase)
+        let pagePairs: any[] = [];
         if (pageBase) {
           const pageItem = await getItemByPath(
             client!,
@@ -303,16 +464,10 @@ export default function GenerateContent({
             );
             setPageTemplateDefinition(pageRaw);
             pagePairs = extractFieldTypePairs(pageRaw);
-            //setPageFieldTypePairs(pagePairs);
           }
-        } else {
-          //console.log("[SCR3] Base template 'Page' not found.");
         }
 
         // 2) _SEO METADATA
-        const seoBase = nodes.find(
-          (n) => (n.name || "").toLowerCase() === "_seo metadata"
-        );
         if (seoBase) {
           const seoItem = await getItemByPath(
             client!,
@@ -329,13 +484,17 @@ export default function GenerateContent({
             const seoPairs = extractFieldTypePairs(seoRaw);
 
             // Merge & de-duplicate by fieldName
-            const all = [...pagePairs as [], ...seoPairs];
-            let uniquePairs = all.reduce((acc, f) => {
-              if (!acc.some((x:any) => x.fieldName === f.fieldName)) acc.push(f);
-              return acc;
-            }, [] as { fieldName: string; fieldType: string }[]);
+            const all = [...pagePairs, ...seoPairs];
+            let uniquePairs = all.reduce(
+              (acc, f) => {
+                if (!acc.some((x: any) => x.fieldName === f.fieldName))
+                  acc.push(f);
+                return acc;
+              },
+              [] as { fieldName: string; fieldType: string }[]
+            );
 
-            let uniquePairsNew = uniquePairs.map((item:any) => {
+            let uniquePairsNew = uniquePairs.map((item: any) => {
               return {
                 name: item.fieldName,
                 type: item.fieldType,
@@ -345,13 +504,17 @@ export default function GenerateContent({
             });
 
             uniquePairsNew.push({
-              name: 'pageName',
-              type: 'Single-Line Text',
+              name: "pageName",
+              type: "Single-Line Text",
               section: "BaseTemplate",
               value: "",
-            })
-            
-            console.log("uniquePairsNew..........", uniquePairsNew, selectedFile);
+            });
+
+            console.log(
+              "uniquePairsNew..........",
+              uniquePairsNew,
+              selectedFile
+            );
 
             setIsBaseFormLoader(true);
             setIsPageLoading(true);
@@ -361,40 +524,49 @@ export default function GenerateContent({
               const thirdPartyRes = await fetch("/api/chat-bot", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ selectedFile, tFields:uniquePairsNew as any, prompt, brandWebsite }),
+                body: JSON.stringify({
+                  selectedFile,
+                  tFields: uniquePairsNew as any,
+                  prompt,
+                  brandWebsite,
+                }),
               });
-              if (!thirdPartyRes.ok) throw new Error("Third-party API call failed");
+              if (!thirdPartyRes.ok)
+                throw new Error("Third-party API call failed");
               data = await thirdPartyRes.json();
             } finally {
               setIsPageLoading(false);
             }
             let TempFinalResponse = data?.data?.result;
             // uncommented this code later for set page name
-            let pageNameResponse = TempFinalResponse?.filter((item: any) => item.name == 'pageName');
+            let pageNameResponse = TempFinalResponse?.filter(
+              (item: any) => item.name == "pageName"
+            );
             setNewPageName(pageNameResponse[0]?.value);
-            
+
             let finalResponse = uniquePairs.reduce((acc: any[], item: any) => {
-              const match = TempFinalResponse.find((obj: any) =>
-                obj.name == item?.fieldName
+              const match = TempFinalResponse.find(
+                (obj: any) => obj.name == item?.fieldName
               );
 
               if (match) {
                 acc.push({ ...item, ...match });
               }
-            
+
               // if no match, just continue
               return acc;
             }, []);
 
             setPageFieldTypePairs(finalResponse);
             // initialize base form values so BaseTemplate inputs show and control values
-            const initialBaseValues: Record<string, string | boolean> = finalResponse.reduce(
-              (acc: Record<string, string | boolean>, it: any) => {
-                if (it?.fieldName) acc[it.fieldName] = String(it.value ?? "");
-                return acc;
-              },
-              {}
-            );
+            const initialBaseValues: Record<string, string | boolean> =
+              finalResponse.reduce(
+                (acc: Record<string, string | boolean>, it: any) => {
+                  if (it?.fieldName) acc[it.fieldName] = String(it.value ?? "");
+                  return acc;
+                },
+                {}
+              );
             // if (pageNameResponse?.[0]?.value) {
             //   initialBaseValues["pageName"] = String(pageNameResponse[0].value);
             // }
@@ -411,7 +583,7 @@ export default function GenerateContent({
         );
       }
     })();
-  }, [client, sitecoreContextId]);
+  }, [client, sitecoreContextId, selectedTemplateData?.itemID]);
 
   // Click → load template fields from datasource template (right panel)
   const onClickRendering = async (componentIdRaw: string, compName: any) => {
@@ -451,7 +623,7 @@ export default function GenerateContent({
         sitecoreContextId,
         templateClean
       );
-      
+
       let contentSummary = await generateContentSummary(tFields);
       let currentTimeStamp = Date.now().toString().slice(-6);
       let compNameUnique = compName?.toLowerCase() + "_" + currentTimeStamp;
@@ -631,14 +803,14 @@ export default function GenerateContent({
       case "Image":
         return (
           <div onClick={(e) => e.stopPropagation()}>
-      <GetMediaItems
-        appContext={appContext}
-        client={client}
-        onMediaSelect={(media) => {
-          setFormValues((prev) => ({ ...prev, [f.name]: media.id }));
-        }}
-      />
-    </div>
+            <GetMediaItems
+              appContext={appContext}
+              client={client}
+              onMediaSelect={(media) => {
+                setFormValues((prev) => ({ ...prev, [f.name]: media.id }));
+              }}
+            />
+          </div>
         );
       case "File":
         return (
@@ -739,6 +911,13 @@ export default function GenerateContent({
       setIsPageLoading(true);
       setSaving(true);
 
+      console.log("[SCR3][onSaveDatasource] START", {
+        newItemName,
+        dsTemplate,
+        activeRenderingId,
+        selectedRenderingName: selectedInfo?.name,
+      });
+
       // Resolve template id from cleaned template path/ID
       const templateId = await resolveTemplateId(
         client,
@@ -747,7 +926,7 @@ export default function GenerateContent({
       );
       const fieldsPayload = toCreateFields(formValues, fields);
 
-       // Create the item (fields are inlined inside the mutation)
+      // Create the item (fields are inlined inside the mutation)
       let parentId = PARENT_ID;
       if (selectedInfo?.name?.toLowerCase().includes("carousel")) {
         parentId = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
@@ -757,12 +936,21 @@ export default function GenerateContent({
         parentId = "{E812C7E5-8C9C-4848-A36A-B1FFB5B94387}";
       }
 
+      console.log("[SCR3][onSaveDatasource] parent/template/fields", {
+        parentId,
+        templateId,
+        fieldCount: fieldsPayload.length,
+      });
+
+      // 3) Create the datasource item FIRST
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
         parentId: parentId,
         templateId: templateId,
         fields: fieldsPayload,
       });
+
+      console.log("[SCR3][onSaveDatasource] created item", item);
 
       // Normalize the datasource ID to proper {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} format
       const normalizedDsId = toBracedDashedGuid(item.itemId);
@@ -776,6 +964,8 @@ export default function GenerateContent({
         dataSourceId: normalizedDsId ?? item.itemId, // fallback if normalization fails
         dataSourcePath: item.path,
       };
+
+      console.log("[SCR3][onSaveDatasource] rdso", rdso);
 
       setRenderingDatasourceObject(rdso);
       console.log("[RenderingDataSourceObject]", rdso);
@@ -804,7 +994,7 @@ export default function GenerateContent({
   };
 
   // === Create Blog Page (uses BASE form values only)
-  const onCreateBlogPage = async () => {
+  const onCreatePage = async () => {
     setPageError("");
     setPageCreated(null);
 
@@ -825,14 +1015,30 @@ export default function GenerateContent({
       const pageMetas = pairsToMetas(pageFieldTypePairs);
       const fieldsPayload = toCreateFields(baseFormValues, pageMetas);
 
-      // FORCE: Blog template (brace-wrapped, uppercased)
-      const templateId = "{43C1BC5D-831F-47F8-9D03-D3BA6602A0FD}";
+      // Determine which template & parent to use based on the selection
+      const selectedTemplateIdRaw = selectedTemplateData?.itemID;
+      if (!selectedTemplateIdRaw) {
+        setPageError("No template selected.");
+        return;
+      }
 
-      // FORCE: Parent is “All Blogs”
-      const parentId = BLOG_PARENT_ID;
+      // Normalize ID for lookup in TEMPLATE_PARENT_MAP
+      const templateKey = norm32(selectedTemplateIdRaw);
+      const templateId = selectedTemplateIdRaw; // use the itemId as-is ({GUID})
+
+      // Resolve parent folder from our config map, fallback to Blog parent if missing
+      const parentId = TEMPLATE_PARENT_MAP[templateKey] ?? BLOG_PARENT_ID;
 
       // Prefer the Page Name textbox, fallback to the auto item name if needed
       const pageName = newPageName.trim() || newItemName.trim();
+
+      console.log("[CreatePage][debug]", {
+        selectedTemplateName: selectedTemplateData?.name,
+        selectedTemplateIdRaw,
+        templateKey,
+        resolvedParentId: parentId,
+        pageName,
+      });
 
       console.log("[CreateBlogPage][vars]", {
         pageName,
@@ -848,37 +1054,58 @@ export default function GenerateContent({
         fields: fieldsPayload,
       });
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
-     // setCreatingPage(false);
+      // setCreatingPage(false);
       setPageCreated({ itemId: item.itemId, name: item.name, path: item.path });
 
-    // 1) Fetch the __Final Renderings XML for the newly-created page
-    const originalXml = await fetchFinalRenderingsXML(client!, sitecoreContextId, item.itemId);
-    setBlogFinalRenderingsXML(originalXml);
+      // 1) Fetch the __Final Renderings XML for the newly-created page
+      const originalXml = await fetchFinalRenderingsXML(
+        client!,
+        sitecoreContextId,
+        item.itemId
+      );
+      setBlogFinalRenderingsXML(originalXml);
 
-    // 2) Merge your saved datasource assignments into the fetched XML
-    //    (expects renderingDatasourceObjects: { renderingId, dataSourceId, ... }[])
-    const assignments =
-      (renderingDatasourceObjects ?? []).map((o: any) => ({
-        renderingId: o.renderingId,
-        dataSourceId: o.dataSourceId,
-      })) || [];
+      // 2) Merge your saved datasource assignments into the fetched XML
+      //    (expects renderingDatasourceObjects: { renderingId, dataSourceId, ... }[])
+      const assignments =
+        (renderingDatasourceObjects ?? []).map((o: any) => ({
+          renderingId: o.renderingId,
+          dataSourceId: o.dataSourceId,
+        })) || [];
 
-    const mergedXml = mergeDatasourcesIntoFinalRenderingsXml(originalXml, assignments);
-    setBlogFinalRenderingsXMLUpdated(mergedXml);
-    console.log("[BlogItemFinalRenderingsXML:Updated][ItemId]", item.itemId, mergedXml);
+      console.log("[DEBUG][CreatePage][Assignments]", assignments);
+      console.log("[DEBUG][CreatePage][OriginalXml]", originalXml);
 
-    // 3) Push the updated XML back to Sitecore (__Final Renderings)
-    if (mergedXml && mergedXml !== originalXml) {
-      await updateFinalRenderingsXML(client!, sitecoreContextId, item.itemId, mergedXml);
-      console.log("[UpdateFinalRenderingsXML][ok]", item.itemId);
+      const mergedXml = mergeDatasourcesIntoFinalRenderingsXml(
+        originalXml,
+        assignments
+      );
+      setBlogFinalRenderingsXMLUpdated(mergedXml);
+      console.log("[DEBUG][CreatePage][MergedXml]", mergedXml);
+      console.log(
+        "[BlogItemFinalRenderingsXML:Updated][ItemId]",
+        item.itemId,
+        mergedXml
+      );
 
-      // (optional quick verify)
-      // const persisted = await fetchFinalRenderingsXML(client!, sitecoreContextId, item.itemId);
-      // console.log("[BlogItemFinalRenderingsXML:Persisted][ItemId]", item.itemId, persisted);
-    } else {
-      console.log("[UpdateFinalRenderingsXML][no-change]", { itemId: item.itemId });
-    }
+      // 3) Push the updated XML back to Sitecore (__Final Renderings)
+      if (mergedXml && mergedXml !== originalXml) {
+        await updateFinalRenderingsXML(
+          client!,
+          sitecoreContextId,
+          item.itemId,
+          mergedXml
+        );
+        console.log("[UpdateFinalRenderingsXML][ok]", item.itemId);
 
+        // (optional quick verify)
+        // const persisted = await fetchFinalRenderingsXML(client!, sitecoreContextId, item.itemId);
+        // console.log("[BlogItemFinalRenderingsXML:Persisted][ItemId]", item.itemId, persisted);
+      } else {
+        console.log("[UpdateFinalRenderingsXML][no-change]", {
+          itemId: item.itemId,
+        });
+      }
     } catch (e: any) {
       console.error("[CreateBlogPage][ERROR]", e);
       setPageError(e?.message || "Failed to create blog page.");
@@ -919,24 +1146,30 @@ export default function GenerateContent({
     const rNodes = Array.from(doc.getElementsByTagName("r")); // all <r .../>
 
     for (const r of rNodes) {
-      const sId = r.getAttribute("s:id");
-      if (!sId) continue;
+      const idAttr = r.getAttribute("s:id") || r.getAttribute("id");
+      if (!idAttr) continue;
 
       const target = assignments.find(
-        (a) => norm32(a.renderingId) === norm32(sId)
+        (a) => norm32(a.renderingId) === norm32(idAttr)
       );
       if (!target) continue;
 
       const dashedBracedDs = toDashedGuid(target.dataSourceId);
       if (!dashedBracedDs) {
         console.warn("[FinalRenderingsXML][skip-invalid-datasourceId]", {
-          renderingId: sId,
+          renderingId: idAttr,
           dataSourceId: target.dataSourceId,
         });
         continue; // do not write an invalid guid
       }
 
-      r.setAttribute("s:ds", dashedBracedDs);
+      // if this rendering already uses plain "ds", update that.
+      // Otherwise fall back to "s:ds".
+      if (r.hasAttribute("ds")) {
+        r.setAttribute("ds", dashedBracedDs);
+      } else {
+        r.setAttribute("s:ds", dashedBracedDs);
+      }
     }
 
     const serializer = new XMLSerializer();
@@ -966,15 +1199,32 @@ export default function GenerateContent({
   return (
     <Box p={6} maxW="6xl" mx="auto">
       {isPageLoading && (
-        <Box position="fixed" inset={0} zIndex={9999} bg="blackAlpha.600" display="flex" alignItems="center" justifyContent="center">
+        <Box
+          position="fixed"
+          inset={0}
+          zIndex={9999}
+          bg="blackAlpha.600"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
           <Stack direction="row" spacing={3} align="center" color="gray.100">
-            <Spinner size="md" thickness='3px' speed='0.65s' emptyColor='whiteAlpha.300' color='white' />
-            <Text fontSize="sm" fontWeight="medium">Loading…</Text>
+            <Spinner
+              size="md"
+              thickness="3px"
+              speed="0.65s"
+              emptyColor="whiteAlpha.300"
+              color="white"
+            />
+            <Text fontSize="sm" fontWeight="medium">
+              Loading…
+            </Text>
           </Stack>
         </Box>
       )}
 
-      <Card title="Generate Content"
+      <Card
+        title="Generate Content"
         subtitle={
           selectedTemplateData
             ? `Template: ${selectedTemplateData.name} • Page Item ID: ${selectedTemplateData.itemID}`
@@ -983,17 +1233,41 @@ export default function GenerateContent({
       />
 
       {/* 3) Renderings UI */}
-      <Box display="grid" gridTemplateColumns={{ base: '1fr', lg: '1fr 1fr 1fr' }} gap={6}>
+      <Box
+        display="grid"
+        gridTemplateColumns={{ base: "1fr", lg: "1fr 1fr 1fr" }}
+        gap={6}
+      >
         <Card
           title="Renderings"
           subtitle="Click a rendering to load its fields"
         >
           {!namesReady ? (
             <Stack spacing={2}>
-              <Box h={7} w={28} borderRadius="full" bg="gray.200" className="animate-pulse" />
-              <Box h={7} w={36} borderRadius="full" bg="gray.200" className="animate-pulse" />
-              <Box h={7} w={24} borderRadius="full" bg="gray.200" className="animate-pulse" />
-              <Text fontSize="xs" color="gray.500">Resolving renderings…</Text>
+              <Box
+                h={7}
+                w={28}
+                borderRadius="full"
+                bg="gray.200"
+                className="animate-pulse"
+              />
+              <Box
+                h={7}
+                w={36}
+                borderRadius="full"
+                bg="gray.200"
+                className="animate-pulse"
+              />
+              <Box
+                h={7}
+                w={24}
+                borderRadius="full"
+                bg="gray.200"
+                className="animate-pulse"
+              />
+              <Text fontSize="xs" color="gray.500">
+                Resolving renderings…
+              </Text>
             </Stack>
           ) : (
             <Stack spacing={3}>
@@ -1039,7 +1313,7 @@ export default function GenerateContent({
           )}
         </Card>
 
-        <Box gridColumn={{ lg: 'span 2' }}>
+        <Box gridColumn={{ lg: "span 2" }}>
           {fields.length > 0 ? (
             <>
               <Card
@@ -1053,70 +1327,142 @@ export default function GenerateContent({
               >
                 {/* Dynamic form */}
                 {[...grouped.entries()].map(([section, items]) => (
-                  <Box key={section || 'default'} mb={5}>
-                    <Text fontSize="sm" fontWeight="medium" color="gray.700" mb={2}>{section || 'Fields'}</Text>
-                    <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={4}>
-                    {items.map((f, i) => (
-                      f.type === "Image" ? (
-                        <Box key={`${section}/${i}`} display="block">
-                          <Box fontSize="xs" mb={1}>
-                            <Text as="span" fontWeight="semibold">{f.name}</Text>{' '}
-                            <Text as="span" color="gray.500">({f.type || 'Text'})</Text>
-                            {f.source ? (
-                              <Text as="span" color="gray.400">{` — ${f.source}`}</Text>
-                            ) : null}
+                  <Box key={section || "default"} mb={5}>
+                    <Text
+                      fontSize="sm"
+                      fontWeight="medium"
+                      color="gray.700"
+                      mb={2}
+                    >
+                      {section || "Fields"}
+                    </Text>
+                    <Box
+                      display="grid"
+                      gridTemplateColumns={{ base: "1fr", md: "1fr 1fr" }}
+                      gap={4}
+                    >
+                      {items.map((f, i) =>
+                        f.type === "Image" ? (
+                          <Box key={`${section}/${i}`} display="block">
+                            <Box fontSize="xs" mb={1}>
+                              <Text as="span" fontWeight="semibold">
+                                {f.name}
+                              </Text>{" "}
+                              <Text as="span" color="gray.500">
+                                ({f.type || "Text"})
+                              </Text>
+                              {f.source ? (
+                                <Text
+                                  as="span"
+                                  color="gray.400"
+                                >{` — ${f.source}`}</Text>
+                              ) : null}
+                            </Box>
+                            {renderInput(f)}
                           </Box>
-                          {renderInput(f)}
-                        </Box>
-                      ) : (
-                        <Box as="label" key={`${section}/${i}`} display="block">
-                          <Box fontSize="xs" mb={1}>
-                            <Text as="span" fontWeight="semibold">{f.name}</Text>{' '}
-                            <Text as="span" color="gray.500">({f.type || 'Text'})</Text>
-                            {f.source ? (
-                              <Text as="span" color="gray.400">{` — ${f.source}`}</Text>
-                            ) : null}
+                        ) : (
+                          <Box
+                            as="label"
+                            key={`${section}/${i}`}
+                            display="block"
+                          >
+                            <Box fontSize="xs" mb={1}>
+                              <Text as="span" fontWeight="semibold">
+                                {f.name}
+                              </Text>{" "}
+                              <Text as="span" color="gray.500">
+                                ({f.type || "Text"})
+                              </Text>
+                              {f.source ? (
+                                <Text
+                                  as="span"
+                                  color="gray.400"
+                                >{` — ${f.source}`}</Text>
+                              ) : null}
+                            </Box>
+                            {renderInput(f)}
                           </Box>
-                          {renderInput(f)}
-                        </Box>
-                      )
-                    ))}
-
+                        )
+                      )}
                     </Box>
                   </Box>
                 ))}
 
                 {/* Create item controls */}
-                <Stack direction={{ base: 'column', md: 'row' }} mt={4} align="end" spacing={3}>
+                <Stack
+                  direction={{ base: "column", md: "row" }}
+                  mt={4}
+                  align="end"
+                  spacing={3}
+                >
                   <Box flex="1">
-                    <Text as="label" display="block" fontSize="xs" fontWeight="semibold" mb={1}>Item Name</Text>
-                    <Box as="input" w="full" borderWidth="1px" borderRadius="lg" p={2} _focus={{ outline: 'none', ring: 2, ringColor: 'gray.300' }} value={newItemName} onChange={(e: any) => setNewItemName(e.target.value)} placeholder="e.g., CarouselItem1" />
+                    <Text
+                      as="label"
+                      display="block"
+                      fontSize="xs"
+                      fontWeight="semibold"
+                      mb={1}
+                    >
+                      Item Name
+                    </Text>
+                    <Box
+                      as="input"
+                      w="full"
+                      borderWidth="1px"
+                      borderRadius="lg"
+                      p={2}
+                      _focus={{
+                        outline: "none",
+                        ring: 2,
+                        ringColor: "gray.300",
+                      }}
+                      value={newItemName}
+                      onChange={(e: any) => setNewItemName(e.target.value)}
+                      placeholder="e.g., CarouselItem1"
+                    />
                   </Box>
-                  
                 </Stack>
                 <Stack direction="row" align="center" spacing={3} mt={5}>
-                  <Button type="button" onClick={onSaveDatasource} isDisabled={saving} colorScheme="gray">
-                    {saving ? 'Saving…' : 'Save Datasource'}
+                  <Button
+                    type="button"
+                    onClick={onSaveDatasource}
+                    isDisabled={saving}
+                    colorScheme="gray"
+                  >
+                    {saving ? "Saving…" : "Save Datasource"}
                   </Button>
-                    <Button variant="outline" onClick={() => setFormValues({})}>Reset Form</Button>
+                  <Button variant="outline" onClick={() => setFormValues({})}>
+                    Reset Form
+                  </Button>
                 </Stack>
 
                 {saveError && (
-                  <Text fontSize="sm" color="red.600" mt={2}>{saveError}</Text>
+                  <Text fontSize="sm" color="red.600" mt={2}>
+                    {saveError}
+                  </Text>
                 )}
                 {created && (
-                  <Alert status="success" mt={2} borderRadius={10} fontSize="14px">
+                  <Alert
+                    status="success"
+                    mt={2}
+                    borderRadius={10}
+                    fontSize="14px"
+                  >
                     <AlertIcon />
-                    <AlertDescription> Created: <strong>{created.name}</strong> (<code>{created.itemId}</code>) — {created.path}</AlertDescription>
-                </Alert>
-                )}                
+                    <AlertDescription>
+                      {" "}
+                      Created: <strong>{created.name}</strong> (
+                      <code>{created.itemId}</code>) — {created.path}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </Card>
-
-              
             </>
           ) : (
             <Card title="No rendering selected">
-              <Text fontSize="sm" color="gray.600">Choose a rendering on the left to see its fields.</Text>
+              <Text fontSize="sm" color="gray.600">
+                Choose a rendering on the left to see its fields.
+              </Text>
             </Card>
           )}
         </Box>
@@ -1124,77 +1470,154 @@ export default function GenerateContent({
 
       {/* === BOTTOM: Create Blog Page === */}
       <Card
-        title="Create Blog Page"
-        subtitle="Create a new blog page under ‘All Blogs’"
+        title={
+          selectedTemplateData
+            ? `Create ${selectedTemplateData.name} Item`
+            : "Create Page"
+        }
+        subtitle={
+          selectedTemplateData
+            ? `Create a new item based on the "${selectedTemplateData.name}" template`
+            : "Create a new page item"
+        }
       >
         {isBaseFormLoader ? (
           <></>
         ) : (
-              pageFieldTypePairs.length > 0 && (
-                <Card
-                  title="Base Template Fields"
-                  subtitle="Auto-generated from Page and _Seo Metadata templates"
-                >
-                  <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={4}>
-                    {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
-                      const meta: TemplateFieldMeta = {
-                        section: "BaseTemplate",
-                        name: fieldName,
-                        type: fieldType,
-                        value: undefined,
-                      };
-                      return (
-                        <Box as="label" key={`BaseTemplate/${fieldName}-${index}`} display="block">
-                          <Box fontSize="xs" mb={1}>
-                            <Text as="span" fontWeight="semibold">{fieldName}</Text>{' '}
-                            <Text as="span" color="gray.500">({fieldType})</Text>
-                          </Box>
-                          {(() => {
-                            const k = meta.name;
-                            const v = baseFormValues[k];
-                            const set = (nv: string | boolean) =>
-                              setBaseFormValues((s) => ({ ...s, [k]: nv }));
-                            if (meta.type === "Checkbox") {
-                              return (
-                                <Box as="label" display="inline-flex" alignItems="center" gap={2}>
-                                  <Box as="input" name={meta.name} type="checkbox" w={4} h={4} checked={Boolean(v)} onChange={(e: any) => set(e.target.checked)} />
-                                  <Text fontSize="sm">Yes</Text>
-                                </Box>
-                              );
-                            }
-                            return (
-                              <Box as="input" w="full" borderWidth="1px" borderRadius="lg" p={2} _focus={{ outline: 'none', ring: 2, ringColor: 'gray.300' }} name={meta.name} value={String(v ?? '')} onChange={(e: any) => set(e.target.value)} />
-                            );
-                          })()}
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                </Card>
+          pageFieldTypePairs.length > 0 && (
+            <Card
+              title="Base Template Fields"
+              subtitle="Auto-generated from Page and _Seo Metadata templates"
+            >
+              <Box
+                display="grid"
+                gridTemplateColumns={{ base: "1fr", md: "1fr 1fr" }}
+                gap={4}
+              >
+                {pageFieldTypePairs.map(({ fieldName, fieldType }, index) => {
+                  const meta: TemplateFieldMeta = {
+                    section: "BaseTemplate",
+                    name: fieldName,
+                    type: fieldType,
+                    value: undefined,
+                  };
+                  return (
+                    <Box
+                      as="label"
+                      key={`BaseTemplate/${fieldName}-${index}`}
+                      display="block"
+                    >
+                      <Box fontSize="xs" mb={1}>
+                        <Text as="span" fontWeight="semibold">
+                          {fieldName}
+                        </Text>{" "}
+                        <Text as="span" color="gray.500">
+                          ({fieldType})
+                        </Text>
+                      </Box>
+                      {(() => {
+                        const k = meta.name;
+                        const v = baseFormValues[k];
+                        const set = (nv: string | boolean) =>
+                          setBaseFormValues((s) => ({ ...s, [k]: nv }));
+                        if (meta.type === "Checkbox") {
+                          return (
+                            <Box
+                              as="label"
+                              display="inline-flex"
+                              alignItems="center"
+                              gap={2}
+                            >
+                              <Box
+                                as="input"
+                                name={meta.name}
+                                type="checkbox"
+                                w={4}
+                                h={4}
+                                checked={Boolean(v)}
+                                onChange={(e: any) => set(e.target.checked)}
+                              />
+                              <Text fontSize="sm">Yes</Text>
+                            </Box>
+                          );
+                        }
+                        return (
+                          <Box
+                            as="input"
+                            w="full"
+                            borderWidth="1px"
+                            borderRadius="lg"
+                            p={2}
+                            _focus={{
+                              outline: "none",
+                              ring: 2,
+                              ringColor: "gray.300",
+                            }}
+                            name={meta.name}
+                            value={String(v ?? "")}
+                            onChange={(e: any) => set(e.target.value)}
+                          />
+                        );
+                      })()}
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Card>
           )
-        )}           
-        <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '2fr 1fr' }} gap={4}>
+        )}
+        <Box
+          display="grid"
+          gridTemplateColumns={{ base: "1fr", md: "2fr 1fr" }}
+          gap={4}
+        >
           <Box>
-            <Text as="label" display="block" fontSize="xs" fontWeight="semibold" mb={1}>Page Name</Text>
-            <Box as="input" w="full" borderWidth="1px" borderRadius="lg" p={2} _focus={{ outline: 'none', ring: 2, ringColor: 'gray.300' }} value={newPageName} onChange={(e: any) => setNewPageName(e.target.value)} placeholder="New Blog Item Name" />
+            <Text
+              as="label"
+              display="block"
+              fontSize="xs"
+              fontWeight="semibold"
+              mb={1}
+            >
+              Page Name
+            </Text>
+            <Box
+              as="input"
+              w="full"
+              borderWidth="1px"
+              borderRadius="lg"
+              p={2}
+              _focus={{ outline: "none", ring: 2, ringColor: "gray.300" }}
+              value={newPageName}
+              onChange={(e: any) => setNewPageName(e.target.value)}
+              placeholder="New Blog Item Name"
+            />
           </Box>
           <Box display="flex" alignItems="flex-end">
-            <Button type="button" onClick={onCreateBlogPage} isDisabled={creatingPage} colorScheme="gray">
-              {creatingPage ? 'Creating…' : 'Create Page'}
+            <Button
+              type="button"
+              onClick={onCreatePage}
+              isDisabled={creatingPage}
+              colorScheme="gray"
+            >
+              {creatingPage ? "Creating…" : "Create Page"}
             </Button>
           </Box>
         </Box>
 
         {pageError && (
           <Alert status="error" mt={2} borderRadius={10}>
-              <AlertIcon />
-              <AlertDescription>{pageError}</AlertDescription>
+            <AlertIcon />
+            <AlertDescription>{pageError}</AlertDescription>
           </Alert>
         )}
         {pageCreated && (
           <Alert status="success" mt={2} borderRadius={10} fontSize="14px">
-              <AlertIcon />
-              <AlertDescription>Created: <strong>{pageCreated.name}</strong> (<code>{pageCreated.itemId}</code>) — {pageCreated.path}</AlertDescription>
+            <AlertIcon />
+            <AlertDescription>
+              Created: <strong>{pageCreated.name}</strong> (
+              <code>{pageCreated.itemId}</code>) — {pageCreated.path}
+            </AlertDescription>
           </Alert>
         )}
       </Card>
