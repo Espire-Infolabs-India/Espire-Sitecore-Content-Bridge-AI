@@ -19,7 +19,7 @@ import { getPageTemplates } from "../utils/gqlQueries/getPageTemplates";
 import { getTemplatesByPathQuery } from "../utils/gqlQueries/getTemplatesByPath";
 import { parseRenderingsFromXml } from "../utils/lib/parseRenderingsFromXml";
 import GenerateContent from "./GenerateContent";
-
+import GetMediaItems from "./GetMediaItems";
 interface Field {
   name?: string;
   value?: string;
@@ -329,5 +329,6 @@ export default function GetPageTemplates({
         </>
       )}
     </Box>
+    
   );
 }
