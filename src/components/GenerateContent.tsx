@@ -26,11 +26,11 @@ import {
   getTemplateDefinitionByPath,
   fetchFinalRenderingsXML,
   updateFinalRenderingsXML,
+  resolveHomePageId,
+  resolveDataFolderIdFromHome,
+  getChildrenWithTemplate,
 } from "../utils/helper/cmsAuthoring";
-import type {
-  TemplateFieldMeta,
-  RenderingInfo,
-} from "../utils/helper/cmsAuthoring";
+import type { TemplateFieldMeta, RenderingInfo } from "../utils/helper/types";
 import {
   parseRenderingsFromXml,
   RenderingFromXml,
@@ -159,17 +159,14 @@ export default function GenerateContent({
 
   const [activeRenderingId, setActiveRenderingId] = useState<string>("");
   const [fields, setFields] = useState<TemplateFieldMeta[]>([]);
-  const [formValues, setFormValues] = useState<FormValues>({}); // Rendering form values
+  const [formValues, setFormValues] = useState<FormValues>({});
   const [dsTemplate, setDsTemplate] = useState<string>("");
-  //const [templateDetails, setTemplateDetails = useState<any>();
   const [dsLocation, setDsLocation] = useState<string>("");
 
   // Base template values
   const [baseFormValues, setBaseFormValues] = useState<FormValues>({}); // Base Page + _SEO values
   const [isBaseFormLoader, setIsBaseFormLoader] = useState<boolean>(false);
 
-  // Hard-coded parent (datasource creation)
-  const PARENT_ID = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
   const [newItemName, setNewItemName] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>("");
@@ -203,24 +200,71 @@ export default function GenerateContent({
     { fieldName: string; fieldType: string; value: any }[]
   >([]);
 
-  // ===================== Template → Parent mapping (config) =====================
+  const [homePageId, setHomePageId] = useState<string | null>(null);
 
-  const TEMPLATE_PARENT_MAP: Record<string, string> = {
-    // Blog template → All Blogs folder (existing behaviour)
-    "43C1BC5D831F47F89D03D3BA6602A0FD":
-      "{CFA8F31E-2335-47DF-8041-B8B8261D6A6A}",
+  const [dataRootId, setDataRootId] = useState<string | null>(null);
 
-    // Banner template → All Banners folder
-    "66E157CC05464A748B739E7A9B412BD3":
-      "{C2138C06-DBA0-45BF-B4B6-85B103A66CD1}",
+  useEffect(() => {
+    if (!client || !sitecoreContextId) return;
 
-    // Page (Content) template → All Pages folder
-    E33FE32537BC4F61AECC0C69EA8F92B0: "{B4BDB665-1828-44AE-9901-419F05F24D3A}",
-  };
+    (async () => {
+      try {
+        const id = await resolveHomePageId(client, sitecoreContextId);
+        console.log("[GenerateContent][HomeResolver][RETURNED id] =", id);
+        setHomePageId(id);
+      } catch (e) {
+        console.error("[GenerateContent][HomeResolver][ERROR]", e);
+      }
+    })();
+  }, [client, sitecoreContextId]);
 
-  // ===================== Blog Page creation constants & state =====================
-  const BLOG_PARENT_ID = "{CFA8F31E-2335-47DF-8041-B8B8261D6A6A}";
-  const BLOG_TEMPLATE_ID = "43C1BC5D-831F-47F8-9D03-D3BA6602A0FD";
+  useEffect(() => {
+    if (!client || !sitecoreContextId) return;
+
+    console.log(
+      "[GenerateContent][HomeResolver][STATE homePageId] =",
+      homePageId
+    );
+
+    if (!homePageId) return;
+
+    (async () => {
+      try {
+        const info = await resolveDataFolderIdFromHome(
+          client,
+          sitecoreContextId,
+          homePageId
+        );
+        if (!info?.dataRootId) {
+          console.warn(
+            "[GenerateContent][DataResolver] Could not resolve /Data from Home."
+          );
+          setDataRootId(null);
+          return;
+        }
+        setDataRootId(info.dataRootId);
+        console.log(
+          "[GenerateContent][DataResolver][OK] dataRootId =",
+          info.dataRootId,
+          "path =",
+          info.dataRootPath
+        );
+      } catch (e: any) {
+        console.error(
+          "[GenerateContent][DataResolver][ERROR]",
+          e?.message || e
+        );
+        setDataRootId(null);
+      }
+    })();
+  }, [client, sitecoreContextId, homePageId]);
+
+  useEffect(() => {
+    console.log(
+      "[GenerateContent][DataResolver][STATE dataRootId] =",
+      dataRootId
+    );
+  }, [dataRootId]);
 
   const [newPageName, setNewPageName] = useState<string>("");
   const [creatingPage, setCreatingPage] = useState(false);
@@ -287,9 +331,6 @@ export default function GenerateContent({
       finalXml || "(EMPTY XML)"
     );
 
-    const DEVICE_HEADLESS_LAYOUT =
-      "{FE5D7FDF-89C0-4D99-9AA3-B5FBD009C9F3}".toLowerCase();
-
     let list: RenderingFromXml[] = [];
 
     if (finalXml) {
@@ -299,16 +340,25 @@ export default function GenerateContent({
         // find correct <d> node (Headless Layout device); fall back to first <d>
         const deviceNodes = Array.from(dom.getElementsByTagName("d"));
         const headlessDevice =
-          deviceNodes.find(
-            (d) =>
-              (d.getAttribute("id") || "").toLowerCase() ===
-              DEVICE_HEADLESS_LAYOUT
-          ) || deviceNodes[0];
+          deviceNodes.find((d) => {
+            const rNodes = Array.from(d.getElementsByTagName("r"));
+            return rNodes.some((r) => {
+              const ph = (
+                r.getAttribute("s:ph") ||
+                r.getAttribute("ph") ||
+                ""
+              ).toLowerCase();
+              return ph.startsWith("headless-"); // headless-main, headless-header, etc.
+            });
+          }) || deviceNodes[0];
 
         if (!headlessDevice) {
           console.warn(
             "[SCR3][RenderingsInit][WARN] No <d> device node found in XML."
           );
+          setNamesReady(true);
+          setIsPageLoading(false);
+          return;
         } else {
           const rNodes = Array.from(headlessDevice.getElementsByTagName("r"));
 
@@ -567,9 +617,7 @@ export default function GenerateContent({
                 },
                 {}
               );
-            // if (pageNameResponse?.[0]?.value) {
-            //   initialBaseValues["pageName"] = String(pageNameResponse[0].value);
-            // }
+
             setBaseFormValues(initialBaseValues);
             setIsBaseFormLoader(false);
           }
@@ -657,7 +705,7 @@ export default function GenerateContent({
       setLoading(true);
       setIsPageLoading(true);
 
-      // 2️⃣ Send to third-party API
+      // Send to third-party API
       const thirdPartyRes = await fetch("/api/chat-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -893,15 +941,72 @@ export default function GenerateContent({
     )}-${hex.slice(16, 20)}-${hex.slice(20, 32)}}`;
   }
 
+  function extractFolderTemplateName(
+    dsLocation: string | null | undefined
+  ): string | null {
+    const s = (dsLocation || "").toString();
+    // matches @@templatename='Image Folder'
+    const m = s.match(/@@templatename\s*=\s*'([^']+)'/i);
+    return m?.[1]?.trim() || null;
+  }
+
+  async function resolveDatasourceParentUnderData(
+    client: ClientSDK,
+    sitecoreContextId: string,
+    dataRootId: string,
+    datasourceLocationValue: string | null | undefined
+  ): Promise<string | null> {
+    const folderTemplateName = extractFolderTemplateName(
+      datasourceLocationValue
+    );
+
+    if (!folderTemplateName) {
+      console.warn(
+        "[resolveDatasourceParentUnderData] No @@templatename found",
+        datasourceLocationValue
+      );
+      return null;
+    }
+
+    const children = await getChildrenWithTemplate(
+      client,
+      sitecoreContextId,
+      dataRootId
+    );
+
+    const match = children.find(
+      (c) => c.templateName.toLowerCase() === folderTemplateName.toLowerCase()
+    );
+
+    if (!match) {
+      console.warn(
+        "[resolveDatasourceParentUnderData] No matching folder under /Data",
+        folderTemplateName,
+        children
+      );
+      return null;
+    }
+
+    console.log("[resolveDatasourceParentUnderData][OK]", {
+      folderTemplateName,
+      parentId: match.itemId,
+      parentPath: match.path,
+    });
+
+    return match.itemId; // STRING ONLY
+  }
+
   const onSaveDatasource = async () => {
     setSaveError("");
     setCreated(null);
 
     if (!client || !sitecoreContextId) return;
+
     if (!newItemName.trim()) {
       setSaveError("Please enter a name for the item.");
       return;
     }
+
     if (!dsTemplate) {
       setSaveError("Datasource Template not found for this rendering.");
       return;
@@ -916,24 +1021,87 @@ export default function GenerateContent({
         dsTemplate,
         activeRenderingId,
         selectedRenderingName: selectedInfo?.name,
+        dataRootId,
       });
 
-      // Resolve template id from cleaned template path/ID
-      const templateId = await resolveTemplateId(
+      // 1) Resolve templateId
+      const rawTemplateId = await resolveTemplateId(
         client,
         sitecoreContextId,
         dsTemplate
       );
+
+      // IMPORTANT: always prefer {DASHED-GUID}
+      const templateId = toBracedDashedGuid(rawTemplateId) ?? rawTemplateId;
+
       const fieldsPayload = toCreateFields(formValues, fields);
 
-      // Create the item (fields are inlined inside the mutation)
-      let parentId = PARENT_ID;
-      if (selectedInfo?.name?.toLowerCase().includes("carousel")) {
-        parentId = "{19175065-C269-4A6D-A2BA-161E7957C2F8}";
-      } else if (selectedInfo?.name?.toLowerCase().includes("promo")) {
-        parentId = "{8E44568A-E881-4CD9-A44F-399049DCF198}";
-      } else if (selectedInfo?.name?.toLowerCase().includes("image")) {
-        parentId = "{E812C7E5-8C9C-4848-A36A-B1FFB5B94387}";
+      // 2) Resolve datasource parent under /Data using datasourceLocation
+      let parentId: string | null = null;
+
+      const dsLocationValue = selectedInfo?.datasourceLocation ?? null;
+      const folderTemplateName = extractFolderTemplateName(dsLocationValue);
+
+      if (dataRootId && folderTemplateName) {
+        try {
+          const children = await getChildrenWithTemplate(
+            client,
+            sitecoreContextId,
+            dataRootId
+          );
+
+          const match = children.find(
+            (c) =>
+              (c.templateName || "").toLowerCase() ===
+              folderTemplateName.toLowerCase()
+          );
+
+          if (match?.itemId) {
+            // Ensure braces+dashes if possible
+            parentId = toBracedDashedGuid(match.itemId) ?? match.itemId;
+
+            console.log("[Step6][onSaveDatasource][ParentResolved][OK]", {
+              folderTemplateName,
+              parentId,
+              parentPath: match.path,
+            });
+          } else {
+            console.warn("[Step6][onSaveDatasource][ParentResolved][WARN]", {
+              folderTemplateName,
+              reason: "No child under /Data matched template name",
+              childrenCount: children.length,
+            });
+          }
+        } catch (e: any) {
+          console.error(
+            "[Step6][onSaveDatasource][ERROR] Parent resolve failed:",
+            e?.message || e
+          );
+          parentId = null;
+        }
+      } else {
+        console.warn("[Step6][onSaveDatasource][WARN] Missing inputs", {
+          dataRootId,
+          folderTemplateName,
+          dsLocationValue,
+        });
+      }
+
+      // 3) Fallbacks (NO hardcoded ID)
+      if (!parentId) {
+        if (!dataRootId) {
+          setSaveError(
+            "Could not resolve datasource parent because Site /Data root is not resolved. Please ensure Home and /Data exist and try again."
+          );
+          return;
+        }
+
+        // safest fallback: create under /Data directly
+        parentId = toBracedDashedGuid(dataRootId) ?? dataRootId;
+        console.warn(
+          "[onSaveDatasource] Falling back parentId to /Data root:",
+          parentId
+        );
       }
 
       console.log("[SCR3][onSaveDatasource] parent/template/fields", {
@@ -942,17 +1110,16 @@ export default function GenerateContent({
         fieldCount: fieldsPayload.length,
       });
 
-      // 3) Create the datasource item FIRST
+      // 4) Create datasource item
       const item = await createItemFromTemplate(client, sitecoreContextId, {
         name: newItemName.trim(),
-        parentId: parentId,
-        templateId: templateId,
+        parentId,
+        templateId,
         fields: fieldsPayload,
       });
 
       console.log("[SCR3][onSaveDatasource] created item", item);
 
-      // Normalize the datasource ID to proper {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} format
       const normalizedDsId = toBracedDashedGuid(item.itemId);
       if (!normalizedDsId) {
         console.warn("[onSaveDatasource][invalid itemId format]", item.itemId);
@@ -961,15 +1128,13 @@ export default function GenerateContent({
       const rdso = {
         renderingName: nameMap[activeRenderingId]?.name ?? "",
         renderingId: activeRenderingId,
-        dataSourceId: normalizedDsId ?? item.itemId, // fallback if normalization fails
+        dataSourceId: normalizedDsId ?? item.itemId,
         dataSourcePath: item.path,
       };
 
       console.log("[SCR3][onSaveDatasource] rdso", rdso);
 
       setRenderingDatasourceObject(rdso);
-      console.log("[RenderingDataSourceObject]", rdso);
-
       setRenderingDatasourceObjects((s) => {
         const next = [...s, rdso];
         console.log("[RenderingDataSourceObject:All]", next);
@@ -978,9 +1143,9 @@ export default function GenerateContent({
 
       setCreated({ itemId: item.itemId, name: item.name, path: item.path });
 
-      // Fetch Final Renderings XML for the newly created item
+      // Fetch Final Renderings XML for the newly created datasource item
       const xml = await fetchFinalRenderingsXML(
-        client!,
+        client,
         sitecoreContextId,
         item.itemId
       );
@@ -995,6 +1160,13 @@ export default function GenerateContent({
 
   // === Create Blog Page (uses BASE form values only)
   const onCreatePage = async () => {
+    if (!homePageId) {
+      setPageError(
+        "Home Page could not be resolved yet. Please refresh and try again."
+      );
+      return;
+    }
+
     setPageError("");
     setPageCreated(null);
 
@@ -1026,8 +1198,21 @@ export default function GenerateContent({
       const templateKey = norm32(selectedTemplateIdRaw);
       const templateId = selectedTemplateIdRaw; // use the itemId as-is ({GUID})
 
-      // Resolve parent folder from our config map, fallback to Blog parent if missing
-      const parentId = TEMPLATE_PARENT_MAP[templateKey] ?? BLOG_PARENT_ID;
+      if (!homePageId) {
+        setPageError("Home Page Id is not resolved yet.");
+        return;
+      }
+
+      if (!homePageId) {
+        setPageError("Home page could not be resolved. Cannot create page.");
+        console.warn(
+          "[CreatePage][ERROR] homePageId is null. Aborting page creation."
+        );
+        return;
+      }
+
+      const parentId = homePageId;
+      console.log("[Samriddhi CreatePage][ParentResolved][OK]", { parentId });
 
       // Prefer the Page Name textbox, fallback to the auto item name if needed
       const pageName = newPageName.trim() || newItemName.trim();
@@ -1040,7 +1225,7 @@ export default function GenerateContent({
         pageName,
       });
 
-      console.log("[CreateBlogPage][vars]", {
+      console.log("[Newly Created Page][vars]", {
         pageName,
         parentId,
         templateId,
